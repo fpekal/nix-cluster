@@ -17,10 +17,10 @@ How it works:
 # Task Nix Flake
 ```nix
 {
-	packages.${system} = {
-		server = derivation; # Server-side part of the task
-		client = derivation; # Client-side part taking additional arguments as task input
-	};
+  packages.${system} = {
+    server = derivation; # Server-side part of the task
+    client = derivation; # Client-side part taking additional arguments as task input
+  };
 }
 ```
 
@@ -35,42 +35,42 @@ In reality it does not `import` this .nix file this way, but uses it as a non-fl
 Example flake:
 ```nix
 {
-	inputs = {
-		nixpkgs.url = "github:nixos/nixpkgs";
-		flake-parts.url = "github:hercules-ci/flake-parts";
-	};
+  inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+  };
 
-	output = inputs @ {flake-parts, ...}:
-		flake-parts.lib.mkFlake {inherit inputs;} {
-			systems = [ "x86_64-linux" "aarch64-linux" ];
+  outputs = inputs @ {flake-parts, ...}:
+    flake-parts.lib.mkFlake {inherit inputs;} {
+      systems = [ "x86_64-linux" "aarch64-linux" ];
 
-			perSystem = {pkgs, ...}: {
-				packages = {
-					server = pkgs.callPackage ./server.nix {}; # Nothing weird here
-					client = pkgs.callPackage (
-						{stdenv, foobar, clientConfig, ...}:
-							stdenv.mkDerivation {
-								pname = "client";
-								version = "1.0.0";
+      perSystem = {pkgs, ...}: {
+        packages = {
+          server = pkgs.callPackage ./server.nix {}; # Nothing weird here
+          client = pkgs.callPackage (
+            {stdenv, foobar, clientConfig, ...}:
+              stdenv.mkDerivation {
+                pname = "client";
+                version = "1.0.0";
 
-								src = ./.;
+                src = ./.;
 
-								CLIENT_FLAGS = clientConfig; # -march flag
+                CLIENT_FLAGS = clientConfig; # -march flag
 
-								FOOBAR = foobar; # puts the server-generated input
-								                 # into the FOOBAR environment variable during the building
-							};
-					) {};
-				};
-			};
-		};
+                FOOBAR = foobar; # puts the server-generated input
+                                 # into the FOOBAR environment variable during the building
+              };
+          ) {};
+        };
+      };
+    };
 }
 ```
 
 Server would generate the input in the form of
 ```nix
 pkgs: {
-	foobar = "123";
+  foobar = "123";
 }
 ```
 And then FOOBAR env var would have a value of 123 during the building

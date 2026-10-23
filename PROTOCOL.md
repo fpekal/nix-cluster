@@ -60,3 +60,67 @@ Kiedy serwer zdecyduje się poprosić jakiegoś klienta o wykonanie zadania, wys
   }
 }
 ```
+
+# Odbieranie tasków
+Kiedy klient odbierze task, to wysyła odpowiedź:
+```json
+{
+  "message_uuid"": "message_uuid_v4",
+  "type": "task_request_response",
+  "content": {
+	"request_uuid": "server_message_uuid",
+	"response": "success"
+  }
+}
+```
+
+Klient zaczyna wykonywać task
+
+# Wysyłanie logów
+Klient może w dowolnym momencie po połączeniu wysłać tekst do serwera, żeby ten wpisał go do logów:
+```json
+{
+  "message_uuid": "message_uuid_v4",
+  "type": "log",
+  "content": {
+	"message": "Tekst!"
+  }
+}
+```
+
+Serwer zapisze go w logach, dopisując przy tym nazwę klienta, od którego dostał tę wiadomość.
+
+# Wynik wykonywania taska
+Kiedy klient skończy wykonywać taska (nieważne, czy zakończono go pozytywnie, czy nie), wysyła do serwera wynik:
+```json
+{
+  "message_uuid": "message_uuid_v4",
+  "type": "task_completed",
+  "content": {
+	"request_uuid": "server_message_uuid",
+	"response": "success", // Dowolny inny tekst oznacza błąd
+	"result": "result" // `cat ./result` po ukończeniu taska TODO: wynik powinien być wysyłany strumieniem?
+  }
+}
+```
+
+# Ping pong
+Serwer i klienci mogą w każdej chwili poprosić drugą stronę o odpowiedzenie na ping.
+```json
+{
+  "message_uuid": "message_uuid_v4",
+  "type": "ping"
+}
+```
+
+```json
+{
+  "message_uuid": "message_uuid_v4",
+  "type": "pong",
+  "content": {
+	"ping_uuid": "ping_uuid"
+	"timestamp": 1792750950
+  }
+}
+```
+

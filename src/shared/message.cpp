@@ -1,28 +1,43 @@
 #include "message.h"
 
+#include <array>
+#include <meta>
+#include <string>
+
 #include <nlohmann/json.hpp>
 
-std::string Message::message_type_to_str(MessageType mes_type) {
-  switch (mes_type) {
-  case INITIALIZE_BUILDER:
-    return "initizlize_builder";
-  case INITIALIZE_BUILDER_RESPONSE:
-    return "initizlize_builder_response";
-  case TASK_REQUEST:
-    return "task_request";
-  case TASK_REQUEST_RESPONSE:
-    return "task_request_response";
-  case TASK_COMPLETED:
-    return "task_completed";
-  case LOG:
-    return "log";
-  case PING:
-    return "ping";
-  case PONG:
-    return "pong";
+template <class Enum> constexpr auto generate_enum_to_string_view_span() {
+  constexpr std::span<const std::meta::info> enumerators =
+      std::define_static_array(std::meta::enumerators_of(^^Enum));
+
+  std::array<std::pair<Enum, std::string_view>, enumerators.size()> ret;
+
+  int i = 0;
+  for (const auto e : enumerators) {
+    ret[i] = std::pair<Enum, std::string_view>{
+        std::meta::extract<Enum>(e),
+        std::define_static_string(std::meta::identifier_of(e))};
+
+    i += 1;
   }
 
-  return "UNKNOWN";
+  return ret;
+}
+
+std::string Message::message_type_to_str(MessageType mes_type) {
+  static constexpr auto conv_array =
+      generate_enum_to_string_view_span<MessageType>();
+
+  for (int i = 0; i < conv_array.size(); ++i) {
+    if (mes_type == conv_array[i].first) {
+      std::string s = std::string{conv_array[i].second};
+      std::transform(s.begin(), s.end(), s.begin(),
+                     [](unsigned char c) { return std::tolower(c); });
+      return s;
+    }
+  }
+
+  return "";
 }
 
 std::string message_to_json(const Message &mes) {

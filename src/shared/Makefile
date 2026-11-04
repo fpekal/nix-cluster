@@ -1,5 +1,5 @@
 build:
-	g++ -O2 -shared -o libshared.so logger.cpp message.cpp
+	g++ -O2 -std=c++26 -freflection -shared -o libshared.so logger.cpp message.cpp
 
 install:
 	mkdir -p ${out}/include

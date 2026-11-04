@@ -1,5 +1,5 @@
 build:
-	g++ -o test main.cpp -lshared
+	g++ -o test -std=c++26 -freflection main.cpp -lshared
 
 install:
 	mkdir -p ${out}/bin

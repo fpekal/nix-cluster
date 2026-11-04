@@ -30,6 +30,8 @@ Inicjalizacja buildera wymaga wysłania do wiadomości:
 `client_config` to customowe informacje DLA SERWERA o kliencie.
 Serwer używa tej informacji żeby samemu wygenerować `client_config`
 wysyłany razem z taskiem.
+Można też użyć tej informacji, żeby dynamicznie móc wybierać który task
+powinien być wykonany przez którego buildera.
 
 Serwer po odczytaniu prośby o inicjalizację buildera odsyła mu wiadomość:
 ```json

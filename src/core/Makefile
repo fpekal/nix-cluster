@@ -1,5 +1,5 @@
 build:
-	g++ -O2 -std=c++26 -freflection -shared -o libcore.so logger.cpp message.cpp
+	g++ -O2 -std=c++26 -freflection -shared -o libcore.so logger.cpp message.cpp -lamqpcpp
 
 install:
 	mkdir -p ${out}/include

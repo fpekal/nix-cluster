@@ -1,9 +1,9 @@
 {
   pkgs,
-  shared,
+  core,
 }:
 pkgs.stdenv.mkDerivation {
   name = "test";
   src = ./.;
-  buildInputs = [shared];
+  buildInputs = [core];
 }

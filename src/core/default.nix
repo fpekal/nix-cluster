@@ -1,6 +1,6 @@
 {pkgs}:
 pkgs.stdenv.mkDerivation {
-  name = "shared";
+  name = "core";
   src = ./.;
   buildInputs = [pkgs.nlohmann_json];
 }

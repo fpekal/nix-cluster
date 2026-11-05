@@ -14,8 +14,8 @@
         ...
       }: {
         packages = {
-          shared = pkgs.callPackage ./src/shared/default.nix {};
-          test = pkgs.callPackage ./src/test/default.nix {inherit (self'.packages) shared;};
+          core = pkgs.callPackage ./src/core/default.nix {};
+          test = pkgs.callPackage ./src/test/default.nix {inherit (self'.packages) core;};
           default = self'.packages.test;
         };
       };

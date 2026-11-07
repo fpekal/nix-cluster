@@ -1,5 +1,6 @@
 #include "rabbitmq.h"
 
+#include <future>
 #include <iostream>
 #include <poll.h>
 
@@ -200,14 +201,21 @@ public:
 
 RabbitMQ::RabbitMQ(std::string_view address) {
   internal = new Internal{address, monitored_fds};
+
+  ready_future = ready_promise.get_future();
 }
 
 RabbitMQ::~RabbitMQ() { delete internal; }
 
 // Takes all sockets that have been sent by the AMQP and checks their status.
 // If they are ready, report it to the AMQP.
+//
+// DON'T RUN THIS FUNCTION WHEN THE MUTEX IS LOCKED.
+// This function is blocking, so it locks mutex inside only when it's needed.
 void RabbitMQ::monitor(int timeout) {
+  mutex.lock();
   internal->connection.heartbeat(); // TODO: Move to some other thread???
+  mutex.unlock();
 
   std::vector<pollfd> polls;
   polls.reserve(monitored_fds.size());
@@ -234,7 +242,9 @@ void RabbitMQ::monitor(int timeout) {
     if (poll.revents & POLLOUT) {
       flags |= AMQP::writable;
     }
+    mutex.lock();
     internal->connection.process(poll.fd, flags);
+    mutex.unlock();
   }
 }
 
@@ -257,9 +267,9 @@ BuilderRabbitMQ::BuilderRabbitMQ(std::string_view address,
         internal->channel.bindQueue("builders", name, routing_key);
 
         // Start listening on the queue.
-        internal->channel.consume(name).onReceived(
-            [this](const AMQP::Message &message, uint64_t deliveryTag,
-                   bool redelivered) {
+        internal->channel.consume(name)
+            .onReceived([this](const AMQP::Message &message,
+                               uint64_t deliveryTag, bool redelivered) {
               // All messages in the queue will be processed by this function
               std::cerr << "MESSAGE RECEIVED: "
                         << std::string_view{message.body(), message.bodySize()}
@@ -267,7 +277,8 @@ BuilderRabbitMQ::BuilderRabbitMQ(std::string_view address,
 
               // Confirm the message was processed successfully
               internal->channel.ack(deliveryTag);
-            });
+            })
+            .onSuccess([this]() { ready_promise.set_value(); });
       });
 }
 

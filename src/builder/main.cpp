@@ -1,3 +1,4 @@
+#include <future>
 #include <iostream>
 
 #include <message.h>
@@ -5,19 +6,25 @@
 #include <uuid.h>
 
 int main() {
-  MessageLog log;
-  log.content.message = "Amognus";
+  BuilderRabbitMQ rabbitmq{"amqp://guest:guest@localhost:5672",
+                           std::string{UUID::generate()}};
 
-  for (int i = 0; i < 16; ++i) {
-    auto uuid = UUID::generate();
-    std::cout << std::string{uuid} << '\n';
-  }
+  auto foo = std::async([&rabbitmq]() {
+    rabbitmq.mutex.lock();
+    auto ready_future = rabbitmq.get_ready_future();
+    rabbitmq.mutex.unlock();
 
-  BuilderRabbitMQ rabbitmq{"amqp://guest:guest@localhost:5672", "moje_uuid"};
+    ready_future.wait();
 
-  rabbitmq.send_message(log);
+    MessageLog log;
+    log.content.message = "Amognus";
+    log.message_uuid = UUID::generate();
 
-  using namespace std::chrono_literals;
+    rabbitmq.mutex.lock();
+    rabbitmq.send_message(log);
+    rabbitmq.mutex.unlock();
+  });
+
   while (true) {
     rabbitmq.monitor(1000);
     std::cout << "." << std::flush;

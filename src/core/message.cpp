@@ -6,7 +6,7 @@
 
 #include <nlohmann/json.hpp>
 
-template <class Enum> constexpr auto generate_enum_to_string_view_span() {
+template <class Enum> constexpr auto generate_enum_to_string_view_array() {
   constexpr std::span<const std::meta::info> enumerators =
       std::define_static_array(std::meta::enumerators_of(^^Enum));
 
@@ -26,7 +26,7 @@ template <class Enum> constexpr auto generate_enum_to_string_view_span() {
 
 std::string Message::message_type_to_str(MessageType mes_type) {
   static constexpr auto conv_array =
-      generate_enum_to_string_view_span<MessageType>();
+      generate_enum_to_string_view_array<MessageType>();
 
   for (int i = 0; i < conv_array.size(); ++i) {
     if (mes_type == conv_array[i].first) {

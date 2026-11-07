@@ -38,3 +38,5 @@ void Logger::set_sink(std::unique_ptr<LoggerSink> &&sink) {
 void Logger::set_level(LoggerLevel level) { this->level = level; }
 
 void Logger::flush() { sink->flush(); }
+
+Logger Logger::global_logger{};

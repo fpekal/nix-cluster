@@ -1,6 +1,7 @@
 #include <future>
 #include <iostream>
 
+#include <logger.h>
 #include <message.h>
 #include <rabbitmq.h>
 #include <uuid.h>
@@ -23,6 +24,8 @@ int main() {
     rabbitmq.mutex.lock();
     rabbitmq.send_message(log);
     rabbitmq.mutex.unlock();
+
+    Logger::get_logger().log(INFO, "Message sent");
   });
 
   while (true) {

@@ -1,6 +1,7 @@
 #pragma once
 #include <format>
 #include <memory>
+#include <mutex>
 #include <string>
 
 class LoggerSink {
@@ -21,6 +22,12 @@ enum LoggerLevel { NONE = 0, ERROR = 1, WARN = 2, INFO = 3, DEBUG = 4 };
 
 class Logger {
 public:
+  static Logger &get_logger() { return global_logger; }
+
+private:
+  static Logger global_logger;
+
+public:
   // Logger ignores messages with LARGER number than currently set one
   static std::string level_to_str(LoggerLevel level);
 
@@ -34,6 +41,7 @@ public:
     std::string level_str = level_to_str(level);
 
     std::string added_level = std::format("[{}] {}", level_str, formatted);
+    std::lock_guard guard{mutex};
     sink->send_raw_message(added_level);
   }
 
@@ -44,4 +52,5 @@ public:
 private:
   std::unique_ptr<LoggerSink> sink;
   LoggerLevel level;
+  std::mutex mutex;
 };

@@ -16,6 +16,7 @@
 
 #include "message.h"
 
+namespace {
 // Class reacting to the TCP events.
 // AMQP also tells this class when it wants to read data from sockets.
 // And when data is available on the socket, we tell AMQP to process this data.
@@ -180,6 +181,7 @@ private:
     std::cout << "HANDLER MONITOR\n";
   }
 };
+} // namespace
 
 // Putting most of the RabbitMQ logic in here allows us to not require including
 // `amqpcpp.h` files in our `rabbitmq.h`.

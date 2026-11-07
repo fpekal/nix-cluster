@@ -46,7 +46,8 @@ public:
   }
 
   void set_sink(std::unique_ptr<LoggerSink> &&sink);
-  void set_level(LoggerLevel level);
+  void set_level(LoggerLevel level) { this->level = level; }
+  LoggerLevel get_level() { return level; }
   void flush();
 
 private:

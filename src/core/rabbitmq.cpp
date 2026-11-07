@@ -1,7 +1,6 @@
 #include "rabbitmq.h"
 
 #include <future>
-#include <iostream>
 #include <poll.h>
 
 #include <amqpcpp.h>
@@ -15,6 +14,7 @@
 #include <amqpcpp/linux_tcp/tcpconnection.h>
 #include <amqpcpp/linux_tcp/tcphandler.h>
 
+#include "logger.h"
 #include "message.h"
 
 namespace {
@@ -44,7 +44,7 @@ private:
     // @todo
     //  add your own implementation, for example initialize things
     //  to handle the connection.
-    std::cout << "HANDLER ATTACHED\n";
+    Logger::get_logger().log(LoggerLevel::DEBUG, "TCP attached");
   }
 
   /**
@@ -58,7 +58,8 @@ private:
   virtual void onConnected(AMQP::TcpConnection *connection) override {
     // @todo
     //  add your own implementation (probably not needed)
-    std::cout << "HANDLER CONNECTED\n";
+    Logger::get_logger().log(LoggerLevel::INFO,
+                             "Connected to the RabbitMQ instance");
   }
 
   /**
@@ -76,7 +77,7 @@ private:
     // @todo
     //  add your own implementation, for example by reading out the
     //  certificate and check if it is indeed yours
-    std::cout << "HANDLER SECURED\n";
+    Logger::get_logger().log(LoggerLevel::DEBUG, "TCP secured");
     return true;
   }
 
@@ -89,7 +90,7 @@ private:
     // @todo
     //  add your own implementation, for example by creating a channel
     //  instance, and start publishing or consuming
-    std::cout << "HANDLER READY\n";
+    Logger::get_logger().log(LoggerLevel::DEBUG, "TCP ready");
   }
 
   /**
@@ -106,8 +107,7 @@ private:
     // @todo
     //  add your own implementation, for example by reporting the error
     //  to the user of your program and logging the error
-    std::cout << "HANDLER ERROR\n";
-    std::cout << message << '\n';
+    Logger::get_logger().log(LoggerLevel::ERROR, "TCP error: {}", message);
   }
 
   /**
@@ -123,7 +123,7 @@ private:
     //  be useful if you want to do some something immediately after the
     //  amqp connection is over, but do not want to wait for the tcp
     //  connection to shut down
-    std::cout << "HANDLER CLOSED\n";
+    Logger::get_logger().log(LoggerLevel::DEBUG, "TCP closed");
   }
 
   /**
@@ -135,7 +135,8 @@ private:
   virtual void onLost(AMQP::TcpConnection *connection) override {
     // @todo
     //  add your own implementation (probably not necessary)
-    std::cout << "HANDLER LOST\n";
+    Logger::get_logger().log(LoggerLevel::ERROR,
+                             "Lost connection to RabbitMQ instance");
   }
 
   /**
@@ -147,7 +148,7 @@ private:
     // @todo
     //  add your own implementation, like cleanup resources or exit the
     //  application
-    std::cout << "HANDLER DETACHED\n";
+    Logger::get_logger().log(LoggerLevel::DEBUG, "TCP detached");
   }
 
   /**
@@ -179,7 +180,7 @@ private:
       monitored_fds.insert({fd, flags});
     }
 
-    std::cout << "HANDLER MONITOR\n";
+    Logger::get_logger().log(LoggerLevel::DEBUG, "TCP monitor");
   }
 };
 } // namespace
@@ -213,6 +214,7 @@ RabbitMQ::~RabbitMQ() { delete internal; }
 // DON'T RUN THIS FUNCTION WHEN THE MUTEX IS LOCKED.
 // This function is blocking, so it locks mutex inside only when it's needed.
 void RabbitMQ::monitor(int timeout) {
+  Logger::get_logger().log(LoggerLevel::DEBUG, "Heartbeat");
   mutex.lock();
   internal->connection.heartbeat(); // TODO: Move to some other thread???
   mutex.unlock();
@@ -242,6 +244,12 @@ void RabbitMQ::monitor(int timeout) {
     if (poll.revents & POLLOUT) {
       flags |= AMQP::writable;
     }
+
+    if (flags != 0) {
+      Logger::get_logger().log(LoggerLevel::DEBUG, "fd {} status changed",
+                               poll.fd);
+    }
+
     mutex.lock();
     internal->connection.process(poll.fd, flags);
     mutex.unlock();
@@ -254,31 +262,64 @@ BuilderRabbitMQ::BuilderRabbitMQ(std::string_view address,
   routing_key = std::string{"builder."} + this->uuid;
 
   // Create "exchange" for sending all messages
-  internal->channel.declareExchange("builders", AMQP::topic);
+  internal->channel.declareExchange("builders", AMQP::topic)
+      .onError([](const char *message) {
+        Logger::get_logger().log(LoggerLevel::ERROR,
+                                 "Exchange declaration error: {}", message);
+      })
+      .onSuccess([this]() {
+        Logger::get_logger().log(LoggerLevel::INFO, "Exchange declared");
 
-  // Create a queue for ONLY this builder.
-  // Messages from exchange will move to this queue when they have the correct
-  // `routing_key`.
-  internal->channel.declareQueue(AMQP::exclusive)
-      .onSuccess([this](const std::string &name, uint32_t messagecount,
-                        uint32_t consumercount) {
-        // If (and when) the queue was made successfully, bind it to the
-        // exchange.
-        internal->channel.bindQueue("builders", name, routing_key);
+        // Create a queue for ONLY this builder.
+        // Messages from exchange will move to this queue when they have the
+        // correct `routing_key`.
+        internal->channel.declareQueue(AMQP::exclusive)
+            .onSuccess([this](const std::string &name, uint32_t messagecount,
+                              uint32_t consumercount) {
+              Logger::get_logger().log(LoggerLevel::INFO,
+                                       "Queue declared, name={}", name);
+              // If (and when) the queue was made successfully, bind it to the
+              // exchange.
+              internal->channel.bindQueue("builders", name, routing_key)
+                  .onError([](const char *message) {
+                    Logger::get_logger().log(
+                        LoggerLevel::ERROR, "Queue binding error: {}", message);
+                  })
+                  .onSuccess([]() {
+                    Logger::get_logger().log(LoggerLevel::INFO, "Queue bound");
+                  });
 
-        // Start listening on the queue.
-        internal->channel.consume(name)
-            .onReceived([this](const AMQP::Message &message,
-                               uint64_t deliveryTag, bool redelivered) {
-              // All messages in the queue will be processed by this function
-              std::cerr << "MESSAGE RECEIVED: "
-                        << std::string_view{message.body(), message.bodySize()}
-                        << '\n';
+              // Start listening on the queue.
+              internal->channel.consume(name)
+                  .onReceived([this](const AMQP::Message &message,
+                                     uint64_t deliveryTag, bool redelivered) {
+                    // All messages in the queue will be processed by this
+                    // function
+                    Logger::get_logger().log(
+                        LoggerLevel::DEBUG,
+                        "Message received: length={}, body={}",
+                        message.bodySize(),
+                        std::string_view{message.body(), message.bodySize()});
 
-              // Confirm the message was processed successfully
-              internal->channel.ack(deliveryTag);
+                    // Confirm the message was processed successfully
+                    internal->channel.ack(deliveryTag);
+                  })
+                  .onError([](const char *message) {
+                    Logger::get_logger().log(LoggerLevel::ERROR,
+                                             "Channel consuming error: {}",
+                                             message);
+                  })
+                  .onSuccess([this]() {
+                    Logger::get_logger().log(
+                        LoggerLevel::INFO,
+                        "Channel consuming started successfully");
+                    ready_promise.set_value();
+                  });
             })
-            .onSuccess([this]() { ready_promise.set_value(); });
+            .onError([](const char *message) {
+              Logger::get_logger().log(LoggerLevel::ERROR,
+                                       "Queue declaration error: {}", message);
+            });
       });
 }
 
@@ -286,4 +327,7 @@ void BuilderRabbitMQ::send_message(const Message &message) {
   std::string message_str = message_to_json(message);
 
   internal->channel.publish("builders", routing_key, message_str);
+  Logger::get_logger().log(LoggerLevel::DEBUG,
+                           "Message sent: length={}, body={}",
+                           message_str.length(), message_str);
 }

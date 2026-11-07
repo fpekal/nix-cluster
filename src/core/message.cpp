@@ -1,28 +1,10 @@
 #include "message.h"
 
-#include <array>
-#include <meta>
 #include <string>
 
 #include <nlohmann/json.hpp>
 
-template <class Enum> constexpr auto generate_enum_to_string_view_array() {
-  constexpr std::span<const std::meta::info> enumerators =
-      std::define_static_array(std::meta::enumerators_of(^^Enum));
-
-  std::array<std::pair<Enum, std::string_view>, enumerators.size()> ret;
-
-  int i = 0;
-  for (const auto e : enumerators) {
-    ret[i] = std::pair<Enum, std::string_view>{
-        std::meta::extract<Enum>(e),
-        std::define_static_string(std::meta::identifier_of(e))};
-
-    i += 1;
-  }
-
-  return ret;
-}
+#include "util.h"
 
 std::string Message::message_type_to_str(MessageType mes_type) {
   static constexpr auto conv_array =

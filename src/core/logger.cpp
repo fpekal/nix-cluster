@@ -3,6 +3,8 @@
 #include <iostream>
 #include <ostream>
 
+#include "util.h"
+
 void LoggerSinkStdout::send_raw_message(std::string_view sv) {
   std::cout << sv << '\n';
 }
@@ -10,17 +12,12 @@ void LoggerSinkStdout::send_raw_message(std::string_view sv) {
 void LoggerSinkStdout::flush() { std::cout << std::flush; }
 
 std::string Logger::level_to_str(LoggerLevel level) {
-  switch (level) {
-  case NONE:
-    return "NONE";
-  case ERROR:
-    return "ERROR";
-  case WARN:
-    return "WARN";
-  case INFO:
-    return "INFO";
-  case DEBUG:
-    return "DEBUG";
+  static constexpr auto levels_mappings =
+      generate_enum_to_string_view_array<LoggerLevel>();
+
+  for (const auto &mapping : levels_mappings) {
+    if (level == mapping.first)
+      return std::string{mapping.second};
   }
 
   return "UNKNOWN";

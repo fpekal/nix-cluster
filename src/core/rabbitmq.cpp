@@ -16,13 +16,23 @@
 
 #include "message.h"
 
+// Class reacting to the TCP events.
+// AMQP also tells this class when it wants to read data from sockets.
+// And when data is available on the socket, we tell AMQP to process this data.
+// Like that, AMQP is completly non-blocking.
 class TcpHandler : public AMQP::TcpHandler {
 public:
   TcpHandler(std::map<int, int> &monitored_fds)
       : AMQP::TcpHandler{}, monitored_fds{monitored_fds} {}
 
 private:
+  // Sockets returned by the AMQP.
+  // We need to wait for them to become ready and then report them back to AMQP.
+  //
+  // first - fd
+  // second - AMQP::writable and/or AMQP::readable flags
   std::map<int, int> &monitored_fds;
+
   /**
    *  Method that is called by the AMQP library when a new connection
    *  is associated with the handler. This is the first call to your handler
@@ -154,13 +164,11 @@ private:
    */
   virtual void monitor(AMQP::TcpConnection *connection, int fd,
                        int flags) override {
-    // @todo
-    //  add your own implementation, for example by adding the file
-    //  descriptor to the main application event loop (like the select() or
-    //  poll() loop). When the event loop reports that the descriptor becomes
-    //  readable and/or writable, it is up to you to inform the AMQP-CPP
-    //  library that the filedescriptor is active by calling the
-    //  connection->process(fd, flags) method.
+    // AMQP tell us it need to read/write to the sockets but AMQP doesn't know
+    // how to *wait* for these sockets to become ready.
+    // So we need to tell it ourselves.
+
+    // Waiting and reporting is done in the `RabbitMQ::Internal` class.
 
     // Stop monitoring
     if (flags == 0) {
@@ -173,6 +181,9 @@ private:
   }
 };
 
+// Putting most of the RabbitMQ logic in here allows us to not require including
+// `amqpcpp.h` files in our `rabbitmq.h`.
+// It makes the API cleaner.
 class RabbitMQ::Internal {
 public:
   TcpHandler handler;
@@ -191,8 +202,10 @@ RabbitMQ::RabbitMQ(std::string_view address) {
 
 RabbitMQ::~RabbitMQ() { delete internal; }
 
+// Takes all sockets that have been sent by the AMQP and checks their status.
+// If they are ready, report it to the AMQP.
 void RabbitMQ::monitor(int timeout) {
-  internal->connection.heartbeat();
+  internal->connection.heartbeat(); // TODO: Move to some other thread???
 
   std::vector<pollfd> polls;
   polls.reserve(monitored_fds.size());
@@ -228,19 +241,29 @@ BuilderRabbitMQ::BuilderRabbitMQ(std::string_view address,
     : RabbitMQ{address}, uuid{uuid} {
   routing_key = std::string{"builder."} + this->uuid;
 
+  // Create "exchange" for sending all messages
   internal->channel.declareExchange("builders", AMQP::topic);
 
+  // Create a queue for ONLY this builder.
+  // Messages from exchange will move to this queue when they have the correct
+  // `routing_key`.
   internal->channel.declareQueue(AMQP::exclusive)
       .onSuccess([this](const std::string &name, uint32_t messagecount,
                         uint32_t consumercount) {
+        // If (and when) the queue was made successfully, bind it to the
+        // exchange.
         internal->channel.bindQueue("builders", name, routing_key);
+
+        // Start listening on the queue.
         internal->channel.consume(name).onReceived(
             [this](const AMQP::Message &message, uint64_t deliveryTag,
                    bool redelivered) {
+              // All messages in the queue will be processed by this function
               std::cerr << "MESSAGE RECEIVED: "
                         << std::string_view{message.body(), message.bodySize()}
                         << '\n';
 
+              // Confirm the message was processed successfully
               internal->channel.ack(deliveryTag);
             });
       });

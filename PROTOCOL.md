@@ -17,6 +17,7 @@ Inicjalizacja buildera wymaga wysłania do wiadomości:
 ```json
 {
   "message_uuid": "message_uuid_v4",
+  "sender": "client_uuid",
   "type": "initialize_builder",
   "content": {
 	"name": "human readable name",
@@ -37,6 +38,7 @@ Serwer po odczytaniu prośby o inicjalizację buildera odsyła mu wiadomość:
 ```json
 {
   "message_uuid": "message_uuid_v4",
+  "sender": "server",
   "type": "initialize_builder_response",
   "content": {
 	"response_uuid": "message_uuid_v4",
@@ -54,6 +56,7 @@ Kiedy serwer zdecyduje się poprosić jakiegoś klienta o wykonanie zadania, wys
 ```json
 {
   "message_uuid": "message_uuid_v4",
+  "sender": "server",
   "type": "task_request",
   "content": {
 	"flake_url": "https://example.com/"
@@ -68,6 +71,7 @@ Kiedy klient odbierze task, to wysyła odpowiedź:
 ```json
 {
   "message_uuid"": "message_uuid_v4",
+  "sender": "client_uuid",
   "type": "task_request_response",
   "content": {
 	"request_uuid": "server_message_uuid",
@@ -83,6 +87,7 @@ Klient może w dowolnym momencie po połączeniu wysłać tekst do serwera, żeb
 ```json
 {
   "message_uuid": "message_uuid_v4",
+  "sender": "client_uuid",
   "type": "log",
   "content": {
 	"message": "Tekst!"
@@ -97,6 +102,7 @@ Kiedy klient skończy wykonywać taska (nieważne, czy zakończono go pozytywnie
 ```json
 {
   "message_uuid": "message_uuid_v4",
+  "sender": "client_uuid",
   "type": "task_completed",
   "content": {
 	"request_uuid": "server_message_uuid",
@@ -111,6 +117,7 @@ Serwer i klienci mogą w każdej chwili poprosić drugą stronę o odpowiedzenie
 ```json
 {
   "message_uuid": "message_uuid_v4",
+  "sender": "client_uuid or server",
   "type": "ping"
 }
 ```
@@ -118,6 +125,7 @@ Serwer i klienci mogą w każdej chwili poprosić drugą stronę o odpowiedzenie
 ```json
 {
   "message_uuid": "message_uuid_v4",
+  "sender": "client_uuid or server",
   "type": "pong",
   "content": {
 	"ping_uuid": "ping_uuid"

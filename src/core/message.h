@@ -17,8 +17,17 @@ public:
 
     PING,
     PONG,
+
+    DISCOVERY,
+    DISCOVERY_RESPONSE,
   };
   static std::string message_type_to_str(MessageType mes_type);
+
+  enum BuilderStatus {
+    IDLE,
+    WORKING,
+  };
+  static std::string builder_status_to_str(BuilderStatus builder_status);
 
 protected:
   // This class should never be constructed directly
@@ -103,6 +112,23 @@ public:
   struct {
     std::string ping_uuid = "";
     std::chrono::high_resolution_clock::time_point timestamp;
+  } content;
+};
+
+class MessageDiscovery : public Message {
+public:
+  MessageDiscovery() { type = DISCOVERY; }
+};
+
+class MessageDiscoveryResponse : public Message {
+public:
+  MessageDiscoveryResponse() { type = DISCOVERY_RESPONSE; }
+
+  struct {
+    std::string request_uuid = "";
+    std::string name = "";
+    std::string client_config = "";
+    BuilderStatus status;
   } content;
 };
 

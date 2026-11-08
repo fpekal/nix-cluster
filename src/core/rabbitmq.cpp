@@ -292,11 +292,24 @@ BuilderRabbitMQ::BuilderRabbitMQ(std::string_view address,
               // exchange.
               internal->channel.bindQueue("builders", name, routing_key)
                   .onError([](const char *message) {
-                    Logger::get_logger().log(
-                        LoggerLevel::ERROR, "Queue binding error: {}", message);
+                    Logger::get_logger().log(LoggerLevel::ERROR,
+                                             "Queue unique binding error: {}",
+                                             message);
                   })
                   .onSuccess([]() {
-                    Logger::get_logger().log(LoggerLevel::INFO, "Queue bound");
+                    Logger::get_logger().log(LoggerLevel::INFO,
+                                             "Queue uniquely bound");
+                  });
+
+              internal->channel.bindQueue("builders", name, "builder.broadcast")
+                  .onError([](const char *message) {
+                    Logger::get_logger().log(
+                        LoggerLevel::ERROR, "Queue broadcast binding error: {}",
+                        message);
+                  })
+                  .onSuccess([]() {
+                    Logger::get_logger().log(LoggerLevel::INFO,
+                                             "Queue broadcast bound");
                   });
 
               // Start listening on the queue.

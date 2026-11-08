@@ -22,6 +22,22 @@ std::string Message::message_type_to_str(MessageType mes_type) {
   return "";
 }
 
+std::string Message::builder_status_to_str(BuilderStatus builder_status) {
+  static constexpr auto conv_array =
+      generate_enum_to_string_view_array<BuilderStatus>();
+
+  for (int i = 0; i < conv_array.size(); ++i) {
+    if (builder_status == conv_array[i].first) {
+      std::string s = std::string{conv_array[i].second};
+      std::transform(s.begin(), s.end(), s.begin(),
+                     [](unsigned char c) { return std::tolower(c); });
+      return s;
+    }
+  }
+
+  return "";
+}
+
 std::string message_to_json(const Message &mes) {
   nlohmann::json json{};
 
@@ -76,6 +92,17 @@ std::string message_to_json(const Message &mes) {
         std::chrono::duration_cast<std::chrono::milliseconds>(
             m.content.timestamp.time_since_epoch())
             .count();
+    break;
+  }
+  case Message::DISCOVERY:
+    break;
+  case Message::DISCOVERY_RESPONSE: {
+    auto &m = static_cast<const MessageDiscoveryResponse &>(mes);
+    json["content"]["request_uuid"] = m.content.request_uuid;
+    json["content"]["name"] = m.content.name;
+    json["content"]["client_config"] = m.content.client_config;
+    json["content"]["status"] =
+        Message::builder_status_to_str(m.content.status);
     break;
   }
   }

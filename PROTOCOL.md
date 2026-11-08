@@ -134,3 +134,30 @@ Serwer i klienci mogą w każdej chwili poprosić drugą stronę o odpowiedzenie
 }
 ```
 
+# Discovery
+Serwer prosi wszystkich builderów o zwrócenie ich aktualnej konfiguracji i stasusu.
+Ta wiadomość wysyłana jest z `routing_key` ustawionym na "builder.broadcast".
+```json
+{
+  "message_uuid": "message_uuid_v4",
+  "sender": "server",
+  "type": "discovery"
+}
+```
+
+# Discovery response
+Odpowiedź na zapytanie z konfiguracją klienta i czy aktualnie rozwiązuje jakiegoś taska.
+Status to może być: "idle", "working"
+```json
+{
+  "message_uuid": "message_uuid_v4",
+  "sender": "client_uuid",
+  "type": "discovery_response",
+  "content": {
+	"request_uuid": "server_message_uuid",
+	"name": "human readable name",
+	"client_config": {...},
+	"status": "status"
+  }
+}
+```

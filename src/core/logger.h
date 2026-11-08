@@ -40,7 +40,21 @@ public:
     std::string formatted = std::format(fmt, std::forward<Args>(args)...);
     std::string level_str = level_to_str(level);
 
-    std::string added_level = std::format("[{}] {}", level_str, formatted);
+    std::string ansi_color = [](LoggerLevel level) {
+      switch (level) {
+      case ERROR:
+        return "\e[0;31m";
+      case WARN:
+        return "\e[0;33m";
+      case DEBUG:
+        return "\e[0;36m";
+      }
+
+      return "";
+    }(level);
+
+    std::string added_level =
+        std::format("[{}{}{}] {}", ansi_color, level_str, "\e[0m", formatted);
     std::lock_guard guard{mutex};
     sink->send_raw_message(added_level);
   }

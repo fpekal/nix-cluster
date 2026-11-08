@@ -26,6 +26,9 @@ public:
     return ready_future;
   }
 
+  // This function should be run frequently
+  void heartbeat();
+
   // Lock this mutex before using any functionality of RabbitMQ.
   std::mutex mutex;
 

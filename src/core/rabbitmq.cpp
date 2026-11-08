@@ -211,11 +211,6 @@ RabbitMQ::~RabbitMQ() { delete internal; }
 // Takes all sockets that have been sent by the AMQP and checks their status.
 // If they are ready, report it to the AMQP.
 void RabbitMQ::monitor(int timeout) {
-  Logger::get_logger().log(LoggerLevel::DEBUG, "Heartbeat");
-  mutex.lock();
-  internal->connection.heartbeat(); // TODO: Move to some other thread???
-  mutex.unlock();
-
   std::vector<pollfd> polls;
   polls.reserve(monitored_fds.size());
 
@@ -250,6 +245,12 @@ void RabbitMQ::monitor(int timeout) {
     std::lock_guard guard{mutex};
     internal->connection.process(poll.fd, flags);
   }
+}
+
+void RabbitMQ::heartbeat() {
+  Logger::get_logger().log(LoggerLevel::DEBUG, "Heartbeat");
+  std::lock_guard guard{mutex};
+  internal->connection.heartbeat();
 }
 
 BuilderRabbitMQ::BuilderRabbitMQ(std::string_view address,

@@ -1,4 +1,6 @@
 #include <future>
+#include <stop_token>
+#include <thread>
 
 #include <logger.h>
 #include <message.h>
@@ -14,9 +16,20 @@ int main() {
   BuilderRabbitMQ rabbitmq{"amqp://guest:guest@localhost:5672",
                            std::string{client_uuid}};
 
+  std::jthread heartbeat_thread{[&rabbitmq](std::stop_token stoken) {
+    auto ready_future = rabbitmq.get_ready_future();
+    ready_future.wait();
+
+    while (!stoken.stop_requested()) {
+      using namespace std::chrono_literals;
+      std::this_thread::sleep_for(5s);
+
+      rabbitmq.heartbeat();
+    }
+  }};
+
   auto foo = std::async([&rabbitmq]() {
     auto ready_future = rabbitmq.get_ready_future();
-
     ready_future.wait();
 
     MessageLog log;
@@ -29,6 +42,8 @@ int main() {
   });
 
   while (true) {
-    rabbitmq.monitor(5000);
+    rabbitmq.monitor(10000);
   }
+
+  heartbeat_thread.request_stop();
 }

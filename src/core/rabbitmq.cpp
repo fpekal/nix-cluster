@@ -210,9 +210,6 @@ RabbitMQ::~RabbitMQ() { delete internal; }
 
 // Takes all sockets that have been sent by the AMQP and checks their status.
 // If they are ready, report it to the AMQP.
-//
-// DON'T RUN THIS FUNCTION WHEN THE MUTEX IS LOCKED.
-// This function is blocking, so it locks mutex inside only when it's needed.
 void RabbitMQ::monitor(int timeout) {
   Logger::get_logger().log(LoggerLevel::DEBUG, "Heartbeat");
   mutex.lock();
@@ -250,9 +247,8 @@ void RabbitMQ::monitor(int timeout) {
                                poll.fd);
     }
 
-    mutex.lock();
+    std::lock_guard guard{mutex};
     internal->connection.process(poll.fd, flags);
-    mutex.unlock();
   }
 }
 

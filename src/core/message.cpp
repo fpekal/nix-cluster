@@ -27,6 +27,7 @@ std::string message_to_json(const Message &mes) {
 
   json["message_uuid"] = mes.message_uuid;
   json["type"] = Message::message_type_to_str(mes.type);
+  json["sender"] = mes.sender;
 
   switch (mes.type) {
   case Message::INITIALIZE_BUILDER: {

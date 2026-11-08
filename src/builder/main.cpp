@@ -28,13 +28,14 @@ int main() {
     }
   }};
 
-  auto foo = std::async([&rabbitmq]() {
+  auto foo = std::async([&rabbitmq, client_uuid]() {
     auto ready_future = rabbitmq.get_ready_future();
     ready_future.wait();
 
     MessageLog log;
     log.content.message = "Amognus";
     log.message_uuid = UUID::generate();
+    log.sender = client_uuid;
 
     rabbitmq.send_message(log);
 

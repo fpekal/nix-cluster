@@ -27,6 +27,7 @@ protected:
 public:
   std::string message_uuid = "";
   MessageType type;
+  std::string sender = "";
 };
 
 class MessageInitializeBuilder : public Message {

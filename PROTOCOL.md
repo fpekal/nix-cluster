@@ -1,16 +1,16 @@
 # Protokół komunikacyjny między serwerem a klientami
 Cała komunikacja odbywa się przez AMQP z RabbitMQ jako broker.
 
-Buildery i serwer wysyłają swoje wiadomości do tego samego exchange o nazwie "builders".
+Serwer wysyła swoje wiadomości do exchange o nazwie "builders".
+Buildery wysyłają swoje wiadomości do exchange o nazwie "server".
 Buildery na początku generują uuidv4, które od tego momentu będzie ich unikalnie identyfikować.
 
-Buildery wysyłają wszystkie wiadomości z `routing_key` o wartości "builder.\[uuid\]"
-Serwer odsyła im wiadomości używając tego samego `routing_key`.
+Serwer wysyła wiadomośći builderom, ustawiając `routing_key` na "builder.\[uuid_buildera\]".
 
 Najpierw builder tworzy swoją kolejkę i podpina ją pod exchange,
-Tworzy Consumera i Publishera i podpina je do wcześniej utworzonej kolejki.
+Tworzy Cosumera i podpina go do wcześniej utworzonej kolejki.
 
-Serwer nasłuchuje wszystkich wiadomości z `routing_key` "builder.*"
+Serwer nasłuchuje wszystkich wiadomości z exchange "server"
 
 # Inicjalizacja
 Inicjalizacja buildera wymaga wysłania do wiadomości:

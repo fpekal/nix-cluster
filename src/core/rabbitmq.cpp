@@ -9,6 +9,7 @@
 #include <amqpcpp/channel.h>
 #include <amqpcpp/connection.h>
 #include <amqpcpp/deferredqueue.h>
+#include <amqpcpp/exchangetype.h>
 #include <amqpcpp/flags.h>
 #include <amqpcpp/linux_tcp.h>
 #include <amqpcpp/linux_tcp/tcpconnection.h>
@@ -258,14 +259,26 @@ BuilderRabbitMQ::BuilderRabbitMQ(std::string_view address,
     : RabbitMQ{address}, uuid{uuid} {
   routing_key = std::string{"builder."} + this->uuid;
 
+  internal->channel.declareExchange("server", AMQP::fanout)
+      .onError([](const char *message) {
+        Logger::get_logger().log(LoggerLevel::ERROR,
+                                 "Server exchange declaration error: {}",
+                                 message);
+      })
+      .onSuccess([this]() {
+        Logger::get_logger().log(LoggerLevel::INFO, "Server exchange declared");
+      });
+
   // Create "exchange" for sending all messages
   internal->channel.declareExchange("builders", AMQP::topic)
       .onError([](const char *message) {
         Logger::get_logger().log(LoggerLevel::ERROR,
-                                 "Exchange declaration error: {}", message);
+                                 "Builders exchange declaration error: {}",
+                                 message);
       })
       .onSuccess([this]() {
-        Logger::get_logger().log(LoggerLevel::INFO, "Exchange declared");
+        Logger::get_logger().log(LoggerLevel::INFO,
+                                 "Builders exchange declared");
 
         // Create a queue for ONLY this builder.
         // Messages from exchange will move to this queue when they have the
@@ -325,7 +338,7 @@ void BuilderRabbitMQ::send_message(const Message &message) {
 
   {
     std::lock_guard guard{mutex};
-    internal->channel.publish("builders", routing_key, message_str);
+    internal->channel.publish("server", "", message_str);
   }
   Logger::get_logger().log(LoggerLevel::DEBUG,
                            "Message sent: length={}, body={}",

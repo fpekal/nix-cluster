@@ -1,6 +1,7 @@
 #pragma once
 #include <chrono>
 #include <string>
+#include <variant>
 
 // Messages sent between the server and the clients
 class Message {
@@ -133,3 +134,10 @@ public:
 };
 
 std::string message_to_json(const Message &mes);
+typedef std::variant<MessageInitializeBuilder, MessageInitializeBuilderResponse,
+                     MessageTaskRequest, MessageTaskRequestResponse,
+                     MessageTaskCompleted, MessageLog, MessagePing, MessagePong,
+                     MessageDiscovery, MessageDiscoveryResponse>
+    AllMessagesVariant;
+
+std::optional<AllMessagesVariant> json_to_message(std::string_view json);

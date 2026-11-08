@@ -1,5 +1,6 @@
 #include "message.h"
 
+#include <chrono>
 #include <string>
 
 #include <nlohmann/json.hpp>
@@ -108,4 +109,87 @@ std::string message_to_json(const Message &mes) {
   }
 
   return json.dump();
+}
+
+std::optional<AllMessagesVariant> json_to_message(std::string_view json) {
+  auto obj = nlohmann::json::parse(json);
+
+  static auto fill_common = [](Message &mes, nlohmann::json &obj) {
+    mes.message_uuid = obj["message_uuid"];
+    mes.sender = obj["sender"];
+  };
+
+  if (obj["type"] == "initialize_builder") {
+    MessageInitializeBuilder mes;
+    fill_common(mes, obj);
+    mes.content.client_config = obj["content"]["client_config"];
+    mes.content.name = obj["content"]["name"];
+    return AllMessagesVariant{mes};
+  }
+  if (obj["type"] == "initialize_builder_response") {
+    MessageInitializeBuilderResponse mes;
+    fill_common(mes, obj);
+    mes.content.response = obj["content"]["response"];
+    mes.content.response_uuid = obj["content"]["response_uuid"];
+    return AllMessagesVariant{mes};
+  }
+  if (obj["type"] == "task_request") {
+    MessageTaskRequest mes;
+    fill_common(mes, obj);
+    mes.content.client_config = obj["content"]["client_config"];
+    mes.content.flake_url = obj["content"]["flake_url"];
+    mes.content.task_input = obj["content"]["task_input"];
+    return AllMessagesVariant{mes};
+  }
+  if (obj["type"] == "task_request_response") {
+    MessageTaskRequestResponse mes;
+    fill_common(mes, obj);
+    mes.content.response = obj["content"]["response"];
+    mes.content.request_uuid = obj["content"]["request_uuid"];
+    return AllMessagesVariant{mes};
+  }
+  if (obj["type"] == "task_completed") {
+    MessageTaskCompleted mes;
+    fill_common(mes, obj);
+    mes.content.response = obj["content"]["response"];
+    mes.content.request_uuid = obj["content"]["request_uuid"];
+    mes.content.result = obj["content"]["result"];
+    return AllMessagesVariant{mes};
+  }
+  if (obj["type"] == "log") {
+    MessageLog mes;
+    fill_common(mes, obj);
+    mes.content.message = obj["content"]["message"];
+    return AllMessagesVariant{mes};
+  }
+  if (obj["type"] == "ping") {
+    MessagePing mes;
+    fill_common(mes, obj);
+    return AllMessagesVariant{mes};
+  }
+  if (obj["type"] == "pong") {
+    MessagePong mes;
+    fill_common(mes, obj);
+    mes.content.ping_uuid = obj["content"]["ping_uuid"];
+    mes.content.timestamp = std::chrono::high_resolution_clock::time_point{
+        std::chrono::milliseconds{
+            static_cast<uint64_t>(obj["content"]["response_uuid"])}};
+    return AllMessagesVariant{mes};
+  }
+  if (obj["type"] == "discovery") {
+    MessageDiscovery mes;
+    fill_common(mes, obj);
+    return AllMessagesVariant{mes};
+  }
+  if (obj["type"] == "discovery_response") {
+    MessageDiscoveryResponse mes;
+    fill_common(mes, obj);
+    mes.content.client_config = obj["content"]["client_config"];
+    mes.content.request_uuid = obj["content"]["request_uuid"];
+    mes.content.name = obj["content"]["name"];
+    mes.content.status = obj["content"]["status"];
+    return AllMessagesVariant{mes};
+  }
+
+  return {};
 }

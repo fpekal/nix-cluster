@@ -2,6 +2,7 @@
 
 #include <logger.h>
 #include <message.h>
+#include <mutex>
 #include <rabbitmq.h>
 #include <uuid.h>
 
@@ -15,9 +16,10 @@ int main() {
                            std::string{client_uuid}};
 
   auto foo = std::async([&rabbitmq]() {
-    rabbitmq.mutex.lock();
+    std::unique_lock lock{rabbitmq.mutex};
+    lock.lock();
     auto ready_future = rabbitmq.get_ready_future();
-    rabbitmq.mutex.unlock();
+    lock.unlock();
 
     ready_future.wait();
 
@@ -25,9 +27,9 @@ int main() {
     log.content.message = "Amognus";
     log.message_uuid = UUID::generate();
 
-    rabbitmq.mutex.lock();
+    lock.lock();
     rabbitmq.send_message(log);
-    rabbitmq.mutex.unlock();
+    lock.unlock();
 
     Logger::get_logger().log(INFO, "Log message sent");
   });

@@ -326,7 +326,10 @@ BuilderRabbitMQ::BuilderRabbitMQ(std::string_view address,
 void BuilderRabbitMQ::send_message(const Message &message) {
   std::string message_str = message_to_json(message);
 
-  internal->channel.publish("builders", routing_key, message_str);
+  {
+    std::lock_guard guard{mutex};
+    internal->channel.publish("builders", routing_key, message_str);
+  }
   Logger::get_logger().log(LoggerLevel::DEBUG,
                            "Message sent: length={}, body={}",
                            message_str.length(), message_str);

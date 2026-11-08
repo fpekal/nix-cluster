@@ -21,7 +21,10 @@ public:
   void monitor(int timeout);
 
   // Used to know when it's safe to send messages etc
-  std::shared_future<void> get_ready_future() { return ready_future; }
+  std::shared_future<void> get_ready_future() {
+    std::lock_guard guard{mutex};
+    return ready_future;
+  }
 
   // Lock this mutex before using any functionality of RabbitMQ.
   std::mutex mutex;

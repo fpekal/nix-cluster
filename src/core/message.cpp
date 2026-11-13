@@ -53,12 +53,6 @@ std::string message_to_json(const Message &mes) {
     json["content"]["client_config"] = m.content.client_config;
     break;
   }
-  case Message::INITIALIZE_BUILDER_RESPONSE: {
-    auto &m = static_cast<const MessageInitializeBuilderResponse &>(mes);
-    json["content"]["response_uuid"] = m.content.response_uuid;
-    json["content"]["response"] = m.content.response;
-    break;
-  }
   case Message::TASK_REQUEST: {
     auto &m = static_cast<const MessageTaskRequest &>(mes);
     json["content"]["flake_url"] = m.content.flake_url;
@@ -124,13 +118,6 @@ std::optional<AllMessagesVariant> json_to_message(std::string_view json) {
     fill_common(mes, obj);
     mes.content.client_config = obj["content"]["client_config"];
     mes.content.name = obj["content"]["name"];
-    return AllMessagesVariant{mes};
-  }
-  if (obj["type"] == "initialize_builder_response") {
-    MessageInitializeBuilderResponse mes;
-    fill_common(mes, obj);
-    mes.content.response = obj["content"]["response"];
-    mes.content.response_uuid = obj["content"]["response_uuid"];
     return AllMessagesVariant{mes};
   }
   if (obj["type"] == "task_request") {

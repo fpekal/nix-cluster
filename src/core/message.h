@@ -50,16 +50,6 @@ public:
   } content;
 };
 
-class MessageInitializeBuilderResponse : public Message {
-public:
-  MessageInitializeBuilderResponse() { type = INITIALIZE_BUILDER_RESPONSE; }
-
-  struct {
-    std::string response_uuid = "";
-    std::string response = "";
-  } content;
-};
-
 class MessageTaskRequest : public Message {
 public:
   MessageTaskRequest() { type = TASK_REQUEST; }
@@ -134,10 +124,10 @@ public:
 };
 
 std::string message_to_json(const Message &mes);
-typedef std::variant<MessageInitializeBuilder, MessageInitializeBuilderResponse,
-                     MessageTaskRequest, MessageTaskRequestResponse,
-                     MessageTaskCompleted, MessageLog, MessagePing, MessagePong,
-                     MessageDiscovery, MessageDiscoveryResponse>
+typedef std::variant<MessageInitializeBuilder, MessageTaskRequest,
+                     MessageTaskRequestResponse, MessageTaskCompleted,
+                     MessageLog, MessagePing, MessagePong, MessageDiscovery,
+                     MessageDiscoveryResponse>
     AllMessagesVariant;
 
 std::optional<AllMessagesVariant> json_to_message(std::string_view json);

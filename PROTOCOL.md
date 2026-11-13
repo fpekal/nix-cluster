@@ -34,22 +34,9 @@ wysyłany razem z taskiem.
 Można też użyć tej informacji, żeby dynamicznie móc wybierać który task
 powinien być wykonany przez którego buildera.
 
-Serwer po odczytaniu prośby o inicjalizację buildera odsyła mu wiadomość:
-```json
-{
-  "message_uuid": "message_uuid_v4",
-  "sender": "server",
-  "type": "initialize_builder_response",
-  "content": {
-	"response_uuid": "message_uuid_v4",
-	"response": "success"
-  }
-}
-```
-
-Dowolna wartość `response` inna niż "success" oznacza nieprzyjęcie połączenia.
-W takiej sytuacji serwer nie będzie wysyłać tasków do tego buildera.
-
+Serwer nie odpowiada na tę wiadomość. Służy ona tylko temu, żeby połączone
+wczesniej serwery mogły natychmiastowo wykryć nowo połączonych builderów,
+bez potrzeby ciągłego wysyłania wiadomości `discovery`.
 
 # Wysyłanie tasków
 Kiedy serwer zdecyduje się poprosić jakiegoś klienta o wykonanie zadania, wysyła mu wiadomość:

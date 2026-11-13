@@ -13,7 +13,7 @@ int main() {
   UUID client_uuid = UUID::generate();
   Logger::get_logger().log(LoggerLevel::INFO, "Client UUID: {}",
                            std::string{client_uuid});
-  BuilderRabbitMQ rabbitmq{"amqp://guest:guest@localhost:5672",
+  BuilderRabbitMQ rabbitmq{"amqp://nix-cluster:develop@amogus:5672/nix-cluster",
                            std::string{client_uuid}};
 
   std::jthread heartbeat_thread{[&rabbitmq](std::stop_token stoken) {

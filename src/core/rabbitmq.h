@@ -32,6 +32,9 @@ public:
   // Lock this mutex before using any functionality of RabbitMQ.
   std::mutex mutex;
 
+  // Gets run when rabbitmq receives correct message
+  std::function<void(AllMessagesVariant &)> message_received_handler;
+
 protected:
   Internal *internal = nullptr;
 

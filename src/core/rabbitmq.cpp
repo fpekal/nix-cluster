@@ -318,11 +318,25 @@ BuilderRabbitMQ::BuilderRabbitMQ(std::string_view address,
                                      uint64_t deliveryTag, bool redelivered) {
                     // All messages in the queue will be processed by this
                     // function
+
+                    std::string_view message_text{message.body(),
+                                                  message.bodySize()};
+
                     Logger::get_logger().log(
                         LoggerLevel::DEBUG,
                         "Message received: length={}, body={}",
-                        message.bodySize(),
-                        std::string_view{message.body(), message.bodySize()});
+                        message.bodySize(), message_text);
+
+                    auto message_opt = json_to_message(message_text);
+
+                    if (message_opt.has_value()) {
+                      if (message_received_handler)
+                        message_received_handler(message_opt.value());
+                    } else {
+                      Logger::get_logger().log(LoggerLevel::ERROR,
+                                               "Got an unparsable message: {}",
+                                               message_text);
+                    }
 
                     // Confirm the message was processed successfully
                     internal->channel.ack(deliveryTag);
@@ -403,12 +417,25 @@ ServerRabbitMQ::ServerRabbitMQ(std::string_view address) : RabbitMQ{address} {
                                            bool redelivered) {
                           // All messages in the queue will be processed by this
                           // function
+
+                          std::string_view message_text{message.body(),
+                                                        message.bodySize()};
+
                           Logger::get_logger().log(
                               LoggerLevel::DEBUG,
                               "Message received: length={}, body={}",
-                              message.bodySize(),
-                              std::string_view{message.body(),
-                                               message.bodySize()});
+                              message.bodySize(), message_text);
+
+                          auto message_opt = json_to_message(message_text);
+
+                          if (message_opt.has_value()) {
+                            if (message_received_handler)
+                              message_received_handler(message_opt.value());
+                          } else {
+                            Logger::get_logger().log(
+                                LoggerLevel::ERROR,
+                                "Got an unparsable message: {}", message_text);
+                          }
 
                           // Confirm the message was processed successfully
                           internal->channel.ack(deliveryTag);

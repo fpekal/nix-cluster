@@ -17,7 +17,8 @@
           core = pkgs.callPackage ./src/core/default.nix {};
           test = pkgs.callPackage ./src/test/default.nix {inherit (self'.packages) core;};
           builder = pkgs.callPackage ./src/builder/default.nix {inherit (self'.packages) core;};
-          default = self'.packages.builder;
+          server = pkgs.callPackage ./src/server/default.nix {inherit (self'.packages) core;};
+          default = self'.packages.server;
         };
       };
     };

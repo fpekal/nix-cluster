@@ -357,3 +357,105 @@ void BuilderRabbitMQ::send_message(const Message &message) {
                            "Message sent: length={}, body={}",
                            message_str.length(), message_str);
 }
+
+ServerRabbitMQ::ServerRabbitMQ(std::string_view address) : RabbitMQ{address} {
+  // Create exchange to send messages to the builders
+  internal->channel.declareExchange("builders", AMQP::topic)
+      .onError([](const char *message) {
+        Logger::get_logger().log(LoggerLevel::ERROR,
+                                 "Builders exchange declaration error: {}",
+                                 message);
+      })
+      .onSuccess([this]() {
+        Logger::get_logger().log(LoggerLevel::INFO,
+                                 "Builders exchange declared");
+      });
+
+  // Create exchange to receive messages from
+  internal->channel.declareExchange("server", AMQP::fanout)
+      .onError([](const char *message) {
+        Logger::get_logger().log(LoggerLevel::ERROR,
+                                 "Server exchange declaration error: {}",
+                                 message);
+      })
+      .onSuccess([this]() {
+        Logger::get_logger().log(LoggerLevel::INFO, "Server exchange declared");
+
+        internal->channel.declareQueue(AMQP::exclusive)
+            .onSuccess([this](const std::string &name, uint32_t messagecount,
+                              uint32_t consumercount) {
+              Logger::get_logger().log(
+                  LoggerLevel::INFO,
+                  "Server queue declaration succeeded: name={}", name);
+
+              internal->channel.bindQueue("server", name, "")
+                  .onError([](const char *message) {
+                    Logger::get_logger().log(
+                        LoggerLevel::ERROR, "Queue binding error: {}", message);
+                  })
+                  .onSuccess([this, name]() {
+                    Logger::get_logger().log(LoggerLevel::INFO, "Queue bound");
+
+                    // Start listening on the queue.
+                    internal->channel.consume(name)
+                        .onReceived([this](const AMQP::Message &message,
+                                           uint64_t deliveryTag,
+                                           bool redelivered) {
+                          // All messages in the queue will be processed by this
+                          // function
+                          Logger::get_logger().log(
+                              LoggerLevel::DEBUG,
+                              "Message received: length={}, body={}",
+                              message.bodySize(),
+                              std::string_view{message.body(),
+                                               message.bodySize()});
+
+                          // Confirm the message was processed successfully
+                          internal->channel.ack(deliveryTag);
+                        })
+                        .onError([](const char *message) {
+                          Logger::get_logger().log(
+                              LoggerLevel::ERROR, "Channel consuming error: {}",
+                              message);
+                        })
+                        .onSuccess([this]() {
+                          Logger::get_logger().log(
+                              LoggerLevel::INFO,
+                              "Channel consuming started successfully");
+                          ready_promise.set_value();
+                        });
+                  });
+            })
+            .onError([](const char *message) {
+              Logger::get_logger().log(LoggerLevel::ERROR,
+                                       "Server queue declaration error: {}",
+                                       message);
+            });
+      });
+}
+
+void ServerRabbitMQ::send_message_to_one(const Message &message,
+                                         std::string_view uuid) {
+  std::string message_str = message_to_json(message);
+
+  {
+    std::lock_guard guard{mutex};
+    internal->channel.publish("builders", std::string{"builder."} + uuid,
+                              message_str);
+  }
+  Logger::get_logger().log(LoggerLevel::DEBUG,
+                           "Message sent: length={}, body={}",
+                           message_str.length(), message_str);
+}
+
+void ServerRabbitMQ::send_message_broadcast(const Message &message) {
+  std::string message_str = message_to_json(message);
+
+  {
+    std::lock_guard guard{mutex};
+    internal->channel.publish("builders", "builder.broadcast", message_str);
+  }
+  Logger::get_logger().log(LoggerLevel::DEBUG,
+                           "Message sent: length={}, body={}",
+                           message_str.length(), message_str);
+}

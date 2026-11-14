@@ -55,3 +55,11 @@ private:
   std::string uuid;
   std::string routing_key;
 };
+
+class ServerRabbitMQ : public RabbitMQ {
+public:
+  ServerRabbitMQ(std::string_view address);
+
+  void send_message_to_one(const Message &message, std::string_view uuid);
+  void send_message_broadcast(const Message &message);
+};

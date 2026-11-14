@@ -1,13 +1,18 @@
 #include <future>
 #include <stop_token>
 #include <thread>
+#include <variant>
 
 #include <logger.h>
 #include <message.h>
 #include <rabbitmq.h>
 #include <uuid.h>
 
+#include "builder.h"
+
 int main() {
+  Builders builders;
+
   Logger::get_logger().set_level(LoggerLevel::DEBUG);
 
   ServerRabbitMQ rabbitmq{"amqp://nix-cluster:develop@amogus:5672/nix-cluster"};
@@ -23,6 +28,23 @@ int main() {
       rabbitmq.heartbeat();
     }
   }};
+
+  rabbitmq.message_received_handler =
+      [&builders](const AllMessagesVariant &message_variant) {
+        if (std::holds_alternative<MessageInitializeBuilder>(message_variant)) {
+          // Save builder's info
+          auto message = std::get<MessageInitializeBuilder>(message_variant);
+          builders[message.sender] =
+              BuilderInfo{message.sender, message.content.name,
+                          message.content.client_config};
+        } else if (std::holds_alternative<MessageLog>(message_variant)) {
+          // Passthrough logs from builders to the servers
+          auto message = std::get<MessageLog>(message_variant);
+          auto &builder_info = builders[message.sender];
+          Logger::get_logger().log(LoggerLevel::INFO, "[{}] {}",
+                                   builder_info.name, message.content.message);
+        }
+      };
 
   auto foo = std::async([&rabbitmq]() {
     auto ready_future = rabbitmq.get_ready_future();

@@ -32,12 +32,24 @@ int main() {
     auto ready_future = rabbitmq.get_ready_future();
     ready_future.wait();
 
-    MessageLog log;
-    log.content.message = "Amognus";
-    log.message_uuid = UUID::generate();
-    log.sender = client_uuid;
+    {
+      MessageInitializeBuilder init_build;
+      init_build.message_uuid = UUID::generate();
+      init_build.sender = client_uuid;
+      init_build.content.name = "Joshua";
+      init_build.content.client_config = "{amo=\"gus\";}";
 
-    rabbitmq.send_message(log);
+      rabbitmq.send_message(init_build);
+    }
+
+    {
+      MessageLog log;
+      log.content.message = "Amognus";
+      log.message_uuid = UUID::generate();
+      log.sender = client_uuid;
+
+      rabbitmq.send_message(log);
+    }
 
     Logger::get_logger().log(INFO, "Log message sent");
   });

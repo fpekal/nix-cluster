@@ -20,6 +20,9 @@ Cluster::Cluster(std::string_view url) : rabbitmq{url} {
   monitor_thread =
       std::jthread{std::bind_front<&Cluster::monitor_thread_handler>(this)};
 
+  discovery_thread =
+      std::jthread{std::bind_front<&Cluster::discovery_thread_handler>(this)};
+
   // Initialize all message handlers' containers
   auto message_types = get_all_enum_values<Message::MessageType>();
   for (auto type : message_types) {
@@ -41,6 +44,29 @@ Cluster::Cluster(std::string_view url) : rabbitmq{url} {
         builders.insert(
             {m.sender, {m.sender, m.content.name, m.content.client_config}});
       }));
+
+  // Handler to save data about builders that have sent the `discovery_response`
+  // message
+  // Saves status of the builder
+  bind_handler(Message::DISCOVERY_RESPONSE,
+               std::make_shared<Handler>(
+                   [this](void *, const AllMessagesVariant &message) {
+                     auto &m = std::get<MessageDiscoveryResponse>(message);
+
+                     std::lock_guard guard{builders_mutex};
+
+                     auto found = builders.find(m.sender);
+                     if (found == builders.end()) {
+                       Logger::get_logger().log(INFO, "Builder {} connected",
+                                                m.content.name);
+                       builders.insert(
+                           {m.sender,
+                            {m.sender, m.content.name, m.content.client_config,
+                             m.content.status}});
+                     } else {
+                       found->second.status = m.content.status;
+                     }
+                   }));
 
   // Respond to PINGs with PONGs
   bind_handler(Message::PING,
@@ -262,5 +288,21 @@ void Cluster::monitor_thread_handler(std::stop_token stop_token) {
 
   while (!stop_token.stop_requested()) {
     rabbitmq.monitor(1000);
+  }
+}
+
+void Cluster::discovery_thread_handler(std::stop_token stop_token) {
+  // Wait for rabbitmq to complete connection
+  rabbitmq.get_ready_future().wait();
+
+  while (!stop_token.stop_requested()) {
+    using namespace std::chrono_literals;
+    std::this_thread::sleep_for(10s);
+
+    MessageDiscovery message;
+    message.sender = "server";
+    message.message_uuid = UUID::generate();
+
+    rabbitmq.send_message_broadcast(message);
   }
 }

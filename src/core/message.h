@@ -28,6 +28,7 @@ public:
     WORKING,
   };
   static std::string builder_status_to_str(BuilderStatus builder_status);
+  static BuilderStatus str_to_builder_status(std::string_view str);
 
 protected:
   // This class should never be constructed directly

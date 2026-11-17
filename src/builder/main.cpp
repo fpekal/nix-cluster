@@ -38,6 +38,20 @@ int main() {
           rabbitmq.send_message(message);
           Logger::get_logger().log(DEBUG, "Sent PONG");
         }
+        if (std::holds_alternative<MessageDiscovery>(message)) {
+          Logger::get_logger().log(DEBUG, "Got DISCOVERY");
+          auto &m = std::get<MessageDiscovery>(message);
+          MessageDiscoveryResponse message;
+          message.sender = client_uuid;
+          message.message_uuid = UUID::generate();
+          message.content.request_uuid = m.message_uuid;
+          message.content.name = "Joshua";
+          message.content.client_config = "{amo=\"gus\";}";
+          message.content.status = Message::IDLE;
+
+          rabbitmq.send_message(message);
+          Logger::get_logger().log(DEBUG, "Sent DISCOVERY_RESPONSE");
+        }
       };
 
   std::jthread heartbeat_thread{[&rabbitmq](std::stop_token stoken) {

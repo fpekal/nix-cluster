@@ -1,5 +1,6 @@
 #include "message.h"
 
+#include <algorithm>
 #include <chrono>
 #include <string>
 
@@ -37,6 +38,22 @@ std::string Message::builder_status_to_str(BuilderStatus builder_status) {
   }
 
   return "";
+}
+
+Message::BuilderStatus Message::str_to_builder_status(std::string_view str) {
+  static constexpr auto conv_array =
+      generate_enum_to_string_view_array<BuilderStatus>();
+
+  for (int i = 0; i < conv_array.size(); ++i) {
+    std::string str_up = std::string{str};
+    std::transform(str_up.begin(), str_up.end(), str_up.begin(),
+                   [](unsigned char c) { return std::toupper(c); });
+    if (str == conv_array[i].second) {
+      return conv_array[i].first;
+    }
+  }
+
+  return IDLE;
 }
 
 std::string message_to_json(const Message &mes) {
@@ -175,7 +192,8 @@ std::optional<AllMessagesVariant> json_to_message(std::string_view json) {
       mes.content.client_config = obj["content"]["client_config"];
       mes.content.request_uuid = obj["content"]["request_uuid"];
       mes.content.name = obj["content"]["name"];
-      mes.content.status = obj["content"]["status"];
+      mes.content.status =
+          Message::str_to_builder_status(obj["content"]["status"].dump());
       return AllMessagesVariant{mes};
     }
 

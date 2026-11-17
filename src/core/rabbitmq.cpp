@@ -1,5 +1,6 @@
 #include "rabbitmq.h"
 
+#include <chrono>
 #include <future>
 #include <poll.h>
 
@@ -256,6 +257,15 @@ void RabbitMQ::heartbeat() {
   internal->connection.heartbeat();
 }
 
+bool RabbitMQ::is_ready() {
+  auto ret = ready_future.wait_for(std::chrono::milliseconds{1});
+  if (ret != std::future_status::ready) {
+    return false;
+  }
+
+  return true;
+}
+
 BuilderRabbitMQ::BuilderRabbitMQ(std::string_view address,
                                  std::string_view uuid)
     : RabbitMQ{address}, uuid{uuid} {
@@ -369,9 +379,9 @@ void BuilderRabbitMQ::send_message(const Message &message) {
     std::lock_guard guard{mutex};
     internal->channel.publish("server", "", message_str);
   }
-  Logger::get_logger().log(LoggerLevel::DEBUG,
-                           "Message sent: length={}, body={}",
-                           message_str.length(), message_str);
+  // Logger::get_logger().log(LoggerLevel::DEBUG,
+  //                          "Message sent: length={}, body={}",
+  //                          message_str.length(), message_str);
 }
 
 ServerRabbitMQ::ServerRabbitMQ(std::string_view address) : RabbitMQ{address} {

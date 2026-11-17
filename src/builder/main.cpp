@@ -2,15 +2,17 @@
 #include <future>
 #include <stop_token>
 #include <thread>
+#include <variant>
 
 #include <logger.h>
 #include <message.h>
 #include <rabbitmq.h>
 #include <uuid.h>
-#include <variant>
+
+#include "remote_sink.h"
 
 int main() {
-  Logger::get_logger().set_level(LoggerLevel::DEBUG);
+  Logger::get_logger().set_level(LoggerLevel::INFO);
 
   UUID client_uuid = UUID::generate();
   Logger::get_logger().log(LoggerLevel::INFO, "Client UUID: {}",
@@ -18,10 +20,14 @@ int main() {
   BuilderRabbitMQ rabbitmq{"amqp://nix-cluster:develop@amogus:5672/nix-cluster",
                            std::string{client_uuid}};
 
+  auto remote_sink =
+      std::make_unique<LoggerSinkRemote>(rabbitmq, std::string{client_uuid});
+  Logger::get_logger().set_sink(std::move(remote_sink));
+
   rabbitmq.message_received_handler =
       [client_uuid, &rabbitmq](const AllMessagesVariant &message) {
         if (std::holds_alternative<MessagePing>(message)) {
-          Logger::get_logger().log(INFO, "Got PING");
+          Logger::get_logger().log(DEBUG, "Got PING");
           auto &m = std::get<MessagePing>(message);
           MessagePong message;
           message.sender = client_uuid;
@@ -30,7 +36,7 @@ int main() {
           message.content.timestamp = std::chrono::high_resolution_clock::now();
 
           rabbitmq.send_message(message);
-          Logger::get_logger().log(INFO, "Sent PONG");
+          Logger::get_logger().log(DEBUG, "Sent PONG");
         }
       };
 

@@ -35,6 +35,8 @@ public:
   // Gets run when rabbitmq receives correct message
   std::function<void(const AllMessagesVariant &)> message_received_handler;
 
+  bool is_ready();
+
 protected:
   Internal *internal = nullptr;
 

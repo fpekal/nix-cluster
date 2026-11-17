@@ -14,7 +14,7 @@
 int main() {
   // Builders builders;
 
-  Logger::get_logger().set_level(LoggerLevel::DEBUG);
+  Logger::get_logger().set_level(LoggerLevel::INFO);
   Cluster cluster{"amqp://nix-cluster:develop@amogus:5672/nix-cluster"};
 
   while (true) {

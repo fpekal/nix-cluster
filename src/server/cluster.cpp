@@ -28,17 +28,19 @@ Cluster::Cluster(std::string_view url) : rabbitmq{url} {
 
   // Handler to save data about builders that have sent the `initialize_builder`
   // message
-  bind_handler(Message::INITIALIZE_BUILDER,
-               std::make_shared<Handler>(
-                   [this](void *, const AllMessagesVariant &message) {
-                     auto &m = std::get<MessageInitializeBuilder>(message);
+  bind_handler(
+      Message::INITIALIZE_BUILDER,
+      std::make_shared<Handler>([this](void *,
+                                       const AllMessagesVariant &message) {
+        auto &m = std::get<MessageInitializeBuilder>(message);
 
-                     std::lock_guard guard{builders_mutex};
+        Logger::get_logger().log(INFO, "Builder {} connected", m.content.name);
 
-                     builders.insert(
-                         {m.sender,
-                          {m.sender, m.content.name, m.content.client_config}});
-                   }));
+        std::lock_guard guard{builders_mutex};
+
+        builders.insert(
+            {m.sender, {m.sender, m.content.name, m.content.client_config}});
+      }));
 
   // Respond to PINGs with PONGs
   bind_handler(Message::PING,

@@ -64,7 +64,15 @@ Cluster::Cluster(std::string_view url) : rabbitmq{url} {
                    [this](void *, const AllMessagesVariant &message) {
                      auto &m = std::get<MessageLog>(message);
 
-                     std::string builder_name = builders.at(m.sender).name;
+                     std::string builder_name = "";
+                     {
+                       auto found = builders.find(m.sender);
+                       if (found == builders.end()) {
+                         builder_name = m.sender;
+                       } else {
+                         builder_name = found->second.name;
+                       }
+                     }
 
                      Logger::get_logger().log_raw(
                          LoggerLevel::INFO, "[\e[0;33mBuilder {}\e[0m] {}",

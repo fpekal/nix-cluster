@@ -8,7 +8,6 @@ class Message {
 public:
   enum MessageType {
     INITIALIZE_BUILDER,
-    INITIALIZE_BUILDER_RESPONSE,
 
     TASK_REQUEST,
     TASK_REQUEST_RESPONSE,

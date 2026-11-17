@@ -1,4 +1,6 @@
 #pragma once
+#include <queue>
+
 #include <logger.h>
 #include <rabbitmq.h>
 
@@ -13,4 +15,8 @@ public:
 private:
   BuilderRabbitMQ &rabbitmq;
   std::string client_uuid;
+
+  // When not connected to the rabbitmq, add log to the queue send them on the
+  // next occasion.
+  std::queue<std::string> queue;
 };

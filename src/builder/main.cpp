@@ -66,16 +66,7 @@ int main() {
       rabbitmq.send_message(init_build);
     }
 
-    {
-      MessageLog log;
-      log.content.message = "Amognus";
-      log.message_uuid = UUID::generate();
-      log.sender = client_uuid;
-
-      rabbitmq.send_message(log);
-    }
-
-    Logger::get_logger().log(INFO, "Log message sent");
+    Logger::get_logger().log(INFO, "Waiting for tasks");
   });
 
   while (true) {

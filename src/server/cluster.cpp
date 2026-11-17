@@ -40,6 +40,35 @@ Cluster::Cluster(std::string_view url) : rabbitmq{url} {
                           {m.sender, m.content.name, m.content.client_config}});
                    }));
 
+  // Respond to PINGs with PONGs
+  bind_handler(Message::PING,
+               std::make_shared<Handler>(
+                   [this](void *, const AllMessagesVariant &message) {
+                     auto &m = std::get<MessagePing>(message);
+
+                     MessagePong new_message;
+                     new_message.sender = "server";
+                     new_message.message_uuid = UUID::generate();
+                     new_message.content.ping_uuid = m.message_uuid;
+                     new_message.content.timestamp =
+                         std::chrono::high_resolution_clock::now();
+
+                     rabbitmq.send_message_to_one(new_message, m.sender);
+                   }));
+
+  // Put into local logs all logs sent by builders
+  bind_handler(Message::LOG,
+               std::make_shared<Handler>(
+                   [this](void *, const AllMessagesVariant &message) {
+                     auto &m = std::get<MessageLog>(message);
+
+                     std::string builder_name = builders.at(m.sender).name;
+
+                     Logger::get_logger().log_raw(
+                         LoggerLevel::INFO, "[\e[0;33mBuilder {}\e[0m] {}",
+                         builder_name, m.content.message);
+                   }));
+
   // Run according handlers when message arrives
   rabbitmq.message_received_handler = [this](
                                           const AllMessagesVariant &message) {
@@ -54,11 +83,25 @@ Cluster::Cluster(std::string_view url) : rabbitmq{url} {
 
     // Checks message type and runs `run_for_handlers` for that message type
     if (std::holds_alternative<MessageInitializeBuilder>(message)) {
-      run_for_handlers(
-          message_handlers.at(Message::MessageType::INITIALIZE_BUILDER),
-          message);
+      run_for_handlers(message_handlers.at(Message::INITIALIZE_BUILDER),
+                       message);
+    } else if (std::holds_alternative<MessageTaskRequest>(message)) {
+      run_for_handlers(message_handlers.at(Message::TASK_REQUEST), message);
+    } else if (std::holds_alternative<MessageTaskRequestResponse>(message)) {
+      run_for_handlers(message_handlers.at(Message::TASK_REQUEST_RESPONSE),
+                       message);
+    } else if (std::holds_alternative<MessageTaskCompleted>(message)) {
+      run_for_handlers(message_handlers.at(Message::TASK_COMPLETED), message);
+    } else if (std::holds_alternative<MessageLog>(message)) {
+      run_for_handlers(message_handlers.at(Message::LOG), message);
+    } else if (std::holds_alternative<MessagePing>(message)) {
+      run_for_handlers(message_handlers.at(Message::PING), message);
     } else if (std::holds_alternative<MessagePong>(message)) {
-      run_for_handlers(message_handlers.at(Message::MessageType::PONG),
+      run_for_handlers(message_handlers.at(Message::PONG), message);
+    } else if (std::holds_alternative<MessageDiscovery>(message)) {
+      run_for_handlers(message_handlers.at(Message::DISCOVERY), message);
+    } else if (std::holds_alternative<MessageDiscoveryResponse>(message)) {
+      run_for_handlers(message_handlers.at(Message::DISCOVERY_RESPONSE),
                        message);
     }
   };
@@ -185,9 +228,10 @@ void Cluster::remove_dead_thread_handler(std::stop_token stop_token) {
     for (auto &future : futures) {
       // Wait and get the result of pinging
       if (!future.second.get()) {
-        // TODO: return name instead of uuid
+        std::string builder_name = builders.at(future.first).name;
+
         Logger::get_logger().log(LoggerLevel::INFO, "Builder {} is dead",
-                                 future.first);
+                                 builder_name);
         // The builder didn't respond. Let's delete them from the memory.
         uuids_to_delete.push_back(future.first);
       }

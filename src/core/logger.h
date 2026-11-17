@@ -59,6 +59,17 @@ public:
     sink->send_raw_message(added_level);
   }
 
+  template <class... Args>
+  void log_raw(LoggerLevel level, std::format_string<Args...> fmt,
+               Args &&...args) {
+    if (level > this->level)
+      return;
+    std::string formatted = std::format(fmt, std::forward<Args>(args)...);
+
+    std::lock_guard guard{mutex};
+    sink->send_raw_message(formatted);
+  }
+
   void set_sink(std::unique_ptr<LoggerSink> &&sink);
   void set_level(LoggerLevel level) { this->level = level; }
   LoggerLevel get_level() { return level; }

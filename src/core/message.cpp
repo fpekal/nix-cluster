@@ -161,7 +161,7 @@ std::optional<AllMessagesVariant> json_to_message(std::string_view json) {
       mes.content.ping_uuid = obj["content"]["ping_uuid"];
       mes.content.timestamp = std::chrono::high_resolution_clock::time_point{
           std::chrono::milliseconds{
-              static_cast<uint64_t>(obj["content"]["response_uuid"])}};
+              static_cast<uint64_t>(obj["content"]["timestamp"])}};
       return AllMessagesVariant{mes};
     }
     if (obj["type"] == "discovery") {

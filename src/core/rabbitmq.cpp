@@ -243,7 +243,9 @@ void RabbitMQ::monitor(int timeout) {
                                poll.fd);
     }
 
-    std::lock_guard guard{mutex};
+    // INFO: this was locking the thread if in some message handler we tried to
+    // send another message
+    // std::lock_guard guard{mutex};
     internal->connection.process(poll.fd, flags);
   }
 }

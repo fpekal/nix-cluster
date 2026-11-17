@@ -1,3 +1,4 @@
+#include <chrono>
 #include <future>
 #include <stop_token>
 #include <thread>
@@ -6,6 +7,7 @@
 #include <message.h>
 #include <rabbitmq.h>
 #include <uuid.h>
+#include <variant>
 
 int main() {
   Logger::get_logger().set_level(LoggerLevel::DEBUG);
@@ -15,6 +17,22 @@ int main() {
                            std::string{client_uuid});
   BuilderRabbitMQ rabbitmq{"amqp://nix-cluster:develop@amogus:5672/nix-cluster",
                            std::string{client_uuid}};
+
+  rabbitmq.message_received_handler =
+      [client_uuid, &rabbitmq](const AllMessagesVariant &message) {
+        if (std::holds_alternative<MessagePing>(message)) {
+          Logger::get_logger().log(INFO, "Got PING");
+          auto &m = std::get<MessagePing>(message);
+          MessagePong message;
+          message.sender = client_uuid;
+          message.message_uuid = UUID::generate();
+          message.content.ping_uuid = m.message_uuid;
+          message.content.timestamp = std::chrono::high_resolution_clock::now();
+
+          rabbitmq.send_message(message);
+          Logger::get_logger().log(INFO, "Sent PONG");
+        }
+      };
 
   std::jthread heartbeat_thread{[&rabbitmq](std::stop_token stoken) {
     auto ready_future = rabbitmq.get_ready_future();

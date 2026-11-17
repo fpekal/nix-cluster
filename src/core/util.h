@@ -1,6 +1,7 @@
 #pragma once
 #include <array>
 #include <meta>
+#include <ranges>
 #include <string_view>
 
 template <class Enum> constexpr auto generate_enum_to_string_view_array() {
@@ -19,4 +20,12 @@ template <class Enum> constexpr auto generate_enum_to_string_view_array() {
   }
 
   return ret;
+}
+
+template <class Enum> constexpr std::span<const Enum> get_all_enum_values() {
+  return std::define_static_array(
+      std::meta::enumerators_of(^^Enum) |
+      std::ranges::views::transform([](const std::meta::info &value) {
+        return std::meta::extract<Enum>(value);
+      }));
 }

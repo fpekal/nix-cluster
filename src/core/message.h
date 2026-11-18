@@ -1,7 +1,11 @@
 #pragma once
 #include <chrono>
+#include <meta>
+#include <optional>
+#include <ranges>
 #include <string>
 #include <variant>
+#include <vector>
 
 // Messages sent between the server and the clients
 class Message {
@@ -40,7 +44,9 @@ public:
   std::string sender = "";
 };
 
-class MessageInitializeBuilder : public Message {
+struct MessageSpecialization {};
+
+class[[= MessageSpecialization{}]] MessageInitializeBuilder : public Message {
 public:
   MessageInitializeBuilder() { type = INITIALIZE_BUILDER; }
 
@@ -50,7 +56,7 @@ public:
   } content;
 };
 
-class MessageTaskRequest : public Message {
+class[[= MessageSpecialization{}]] MessageTaskRequest : public Message {
 public:
   MessageTaskRequest() { type = TASK_REQUEST; }
 
@@ -61,7 +67,7 @@ public:
   } content;
 };
 
-class MessageTaskRequestResponse : public Message {
+class[[= MessageSpecialization{}]] MessageTaskRequestResponse : public Message {
 public:
   MessageTaskRequestResponse() { type = TASK_REQUEST_RESPONSE; }
 
@@ -71,7 +77,7 @@ public:
   } content;
 };
 
-class MessageTaskCompleted : public Message {
+class[[= MessageSpecialization{}]] MessageTaskCompleted : public Message {
 public:
   MessageTaskCompleted() { type = TASK_COMPLETED; }
 
@@ -82,7 +88,7 @@ public:
   } content;
 };
 
-class MessageLog : public Message {
+class[[= MessageSpecialization{}]] MessageLog : public Message {
 public:
   MessageLog() { type = LOG; }
 
@@ -91,12 +97,12 @@ public:
   } content;
 };
 
-class MessagePing : public Message {
+class[[= MessageSpecialization{}]] MessagePing : public Message {
 public:
   MessagePing() { type = PING; }
 };
 
-class MessagePong : public Message {
+class[[= MessageSpecialization{}]] MessagePong : public Message {
 public:
   MessagePong() { type = PONG; }
 
@@ -106,12 +112,12 @@ public:
   } content;
 };
 
-class MessageDiscovery : public Message {
+class[[= MessageSpecialization{}]] MessageDiscovery : public Message {
 public:
   MessageDiscovery() { type = DISCOVERY; }
 };
 
-class MessageDiscoveryResponse : public Message {
+class[[= MessageSpecialization{}]] MessageDiscoveryResponse : public Message {
 public:
   MessageDiscoveryResponse() { type = DISCOVERY_RESPONSE; }
 
@@ -123,11 +129,24 @@ public:
   } content;
 };
 
-std::string message_to_json(const Message &mes);
-typedef std::variant<MessageInitializeBuilder, MessageTaskRequest,
-                     MessageTaskRequestResponse, MessageTaskCompleted,
-                     MessageLog, MessagePing, MessagePong, MessageDiscovery,
-                     MessageDiscoveryResponse>
-    AllMessagesVariant;
+consteval auto message_specializations() {
+  auto ns = std::meta::current_namespace();
+  auto members =
+      std::meta::members_of(ns, std::meta::access_context::current());
 
+  std::vector<std::meta::info> filtered;
+  for (auto member : members) {
+    auto annotations = std::meta::annotations_of_with_type(
+        member, ^^MessageSpecialization);
+
+    if (!annotations.empty()) filtered.push_back(member);
+  }
+
+  return std::define_static_array(filtered);
+}
+
+using AllMessagesVariant =
+    [:std::meta::substitute(^^std::variant, message_specializations()):];
+
+std::string message_to_json(const Message &mes);
 std::optional<AllMessagesVariant> json_to_message(std::string_view json);

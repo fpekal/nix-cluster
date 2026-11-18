@@ -44,9 +44,7 @@ public:
   std::string sender = "";
 };
 
-struct MessageSpecialization {};
-
-class[[= MessageSpecialization{}]] MessageInitializeBuilder : public Message {
+class MessageInitializeBuilder : public Message {
 public:
   MessageInitializeBuilder() { type = INITIALIZE_BUILDER; }
 
@@ -56,7 +54,7 @@ public:
   } content;
 };
 
-class[[= MessageSpecialization{}]] MessageTaskRequest : public Message {
+class MessageTaskRequest : public Message {
 public:
   MessageTaskRequest() { type = TASK_REQUEST; }
 
@@ -67,7 +65,7 @@ public:
   } content;
 };
 
-class[[= MessageSpecialization{}]] MessageTaskRequestResponse : public Message {
+class MessageTaskRequestResponse : public Message {
 public:
   MessageTaskRequestResponse() { type = TASK_REQUEST_RESPONSE; }
 
@@ -77,7 +75,7 @@ public:
   } content;
 };
 
-class[[= MessageSpecialization{}]] MessageTaskCompleted : public Message {
+class MessageTaskCompleted : public Message {
 public:
   MessageTaskCompleted() { type = TASK_COMPLETED; }
 
@@ -88,7 +86,7 @@ public:
   } content;
 };
 
-class[[= MessageSpecialization{}]] MessageLog : public Message {
+class MessageLog : public Message {
 public:
   MessageLog() { type = LOG; }
 
@@ -97,12 +95,12 @@ public:
   } content;
 };
 
-class[[= MessageSpecialization{}]] MessagePing : public Message {
+class MessagePing : public Message {
 public:
   MessagePing() { type = PING; }
 };
 
-class[[= MessageSpecialization{}]] MessagePong : public Message {
+class MessagePong : public Message {
 public:
   MessagePong() { type = PONG; }
 
@@ -112,12 +110,12 @@ public:
   } content;
 };
 
-class[[= MessageSpecialization{}]] MessageDiscovery : public Message {
+class MessageDiscovery : public Message {
 public:
   MessageDiscovery() { type = DISCOVERY; }
 };
 
-class[[= MessageSpecialization{}]] MessageDiscoveryResponse : public Message {
+class MessageDiscoveryResponse : public Message {
 public:
   MessageDiscoveryResponse() { type = DISCOVERY_RESPONSE; }
 
@@ -129,24 +127,33 @@ public:
   } content;
 };
 
+// Get all classes in the global scope that inherits `Message` and return
+// std::span<std::meta::info> of them
 consteval auto message_specializations() {
   auto ns = std::meta::current_namespace();
-  auto members =
-      std::meta::members_of(ns, std::meta::access_context::current());
+  auto context = std::meta::access_context::current();
+  auto members = std::meta::members_of(ns, context);
 
   std::vector<std::meta::info> filtered;
   for (auto member : members) {
-    auto annotations = std::meta::annotations_of_with_type(
-        member, ^^MessageSpecialization);
+    if (!std::meta::is_type(member) || !std::meta::is_class_type(member) ||
+        !std::meta::is_complete_type(member))
+      continue;
 
-    if (!annotations.empty()) filtered.push_back(member);
+    for (auto base : std::meta::bases_of(member, context)) {
+      if (std::meta::type_of(base) == ^^Message) {
+        filtered.push_back(member);
+        break;
+      }
+    }
   }
 
   return std::define_static_array(filtered);
 }
 
-using AllMessagesVariant =
-    [:std::meta::substitute(^^std::variant, message_specializations()):];
+// std::variant<...> of all classes that inherits `Message`
+using AllMessagesVariant = [:std::meta::substitute(^^std::variant,
+                                                   message_specializations()):];
 
 std::string message_to_json(const Message &mes);
 std::optional<AllMessagesVariant> json_to_message(std::string_view json);

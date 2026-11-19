@@ -24,34 +24,46 @@ int main() {
       std::make_unique<LoggerSinkRemote>(rabbitmq, std::string{client_uuid});
   Logger::get_logger().set_sink(std::move(remote_sink));
 
+  MessageDispatcher message_dispatcher;
+
+  message_dispatcher.bind_handler(
+      Message::PING,
+      std::make_shared<MessageDispatcher::Handler>(
+          [client_uuid, &rabbitmq](void *, const AllMessagesVariant &message) {
+            Logger::get_logger().log(DEBUG, "Got PING");
+            auto &m = std::get<MessagePing>(message);
+            MessagePong new_message;
+            new_message.sender = client_uuid;
+            new_message.message_uuid = UUID::generate();
+            new_message.content.ping_uuid = m.message_uuid;
+            new_message.content.timestamp =
+                std::chrono::high_resolution_clock::now();
+
+            rabbitmq.send_message(new_message);
+            Logger::get_logger().log(DEBUG, "Sent PONG");
+          }));
+
+  message_dispatcher.bind_handler(
+      Message::DISCOVERY,
+      std::make_shared<MessageDispatcher::Handler>(
+          [client_uuid, &rabbitmq](void *, const AllMessagesVariant &message) {
+            Logger::get_logger().log(DEBUG, "Got DISCOVERY");
+            auto &m = std::get<MessageDiscovery>(message);
+            MessageDiscoveryResponse new_message;
+            new_message.sender = client_uuid;
+            new_message.message_uuid = UUID::generate();
+            new_message.content.request_uuid = m.message_uuid;
+            new_message.content.name = "Joshua";
+            new_message.content.client_config = "{amo=\"gus\";}";
+            new_message.content.status = Message::IDLE;
+
+            rabbitmq.send_message(new_message);
+            Logger::get_logger().log(DEBUG, "Sent DISCOVERY_RESPONSE");
+          }));
+
   rabbitmq.message_received_handler =
-      [client_uuid, &rabbitmq](const AllMessagesVariant &message) {
-        if (std::holds_alternative<MessagePing>(message)) {
-          Logger::get_logger().log(DEBUG, "Got PING");
-          auto &m = std::get<MessagePing>(message);
-          MessagePong message;
-          message.sender = client_uuid;
-          message.message_uuid = UUID::generate();
-          message.content.ping_uuid = m.message_uuid;
-          message.content.timestamp = std::chrono::high_resolution_clock::now();
-
-          rabbitmq.send_message(message);
-          Logger::get_logger().log(DEBUG, "Sent PONG");
-        }
-        if (std::holds_alternative<MessageDiscovery>(message)) {
-          Logger::get_logger().log(DEBUG, "Got DISCOVERY");
-          auto &m = std::get<MessageDiscovery>(message);
-          MessageDiscoveryResponse message;
-          message.sender = client_uuid;
-          message.message_uuid = UUID::generate();
-          message.content.request_uuid = m.message_uuid;
-          message.content.name = "Joshua";
-          message.content.client_config = "{amo=\"gus\";}";
-          message.content.status = Message::IDLE;
-
-          rabbitmq.send_message(message);
-          Logger::get_logger().log(DEBUG, "Sent DISCOVERY_RESPONSE");
-        }
+      [&message_dispatcher](const AllMessagesVariant &message) {
+        message_dispatcher.dispatch(message);
       };
 
   std::jthread heartbeat_thread{[&rabbitmq](std::stop_token stoken) {

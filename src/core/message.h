@@ -13,6 +13,8 @@
 #include <vector>
 
 #include "builder.h"
+#include "logger.h"
+#include "util.h"
 
 // Messages sent between the server and the clients
 class Message {
@@ -177,9 +179,86 @@ public:
   bool unbind_handler(Message::MessageType type,
                       std::shared_ptr<Handler> handler);
 
+  // Pass the message to the correct handlers
   void dispatch(const AllMessagesVariant &message);
 
 private:
+  // Checks if the message is of type `type` and run all handlers
+  template <Message::MessageType type>
+  void dispatch_for_type(const AllMessagesVariant &message) {
+    // `type` is an enum with values looking like `INITIALIZE_BUILDER` or `LOG`.
+    // This function convert this value from `type` to class name
+    // `MessageInitializeBuilder` and `MessageLog`.
+    // And runs std::holds_alternative<MessageInitializeBuilder>(message) etc.
+
+    constexpr auto enum_to_str =
+        generate_enum_to_string_view_array<Message::MessageType>();
+    constexpr std::string_view type_enum_name =
+        std::find_if(enum_to_str.begin(), enum_to_str.end(), [](auto a) {
+          return type == a.first;
+        })->second;
+
+    // Now we have enum value as a string
+
+    constexpr auto convert_to_class_case = [](std::string_view in) constexpr {
+      std::string ret;
+      bool next_upper = true;
+
+      for (char c : in) {
+        if (c == '_') {
+          next_upper = true;
+          continue;
+        }
+        if (next_upper) {
+          ret += toupper(c);
+          next_upper = false;
+        } else {
+          ret += tolower(c);
+        }
+      }
+
+      return std::define_static_string(std::string{"Message"} + ret);
+    };
+
+    constexpr std::string_view type_name =
+        convert_to_class_case(type_enum_name);
+
+    // Now we coverted enum value to the class name
+
+    constexpr std::span<const std::meta::info> all_message_types_meta =
+        message_specializations();
+    constexpr auto all_message_types_pair = std::define_static_array(
+        all_message_types_meta |
+        std::ranges::views::transform(
+            [](const std::meta::info &meta) constexpr {
+              return std::make_pair(
+                  std::define_static_string(std::meta::identifier_of(meta)),
+                  meta);
+            }));
+
+    constexpr auto found_type_meta =
+        std::find_if(
+            all_message_types_pair.begin(), all_message_types_pair.end(),
+            [type_name](const std::pair<std::string_view, std::meta::info> &
+                            elem) constexpr { return elem.first == type_name; })
+            ->second;
+
+    // Now we found the real message class
+
+    // Run all handlers of some type
+    auto run_for_handlers = [](std::vector<std::shared_ptr<Handler>> &handlers,
+                               const AllMessagesVariant &message) {
+      auto handlers_copy = handlers;
+      for (auto &handler : handlers_copy) {
+        (*handler)(&handler, message);
+      }
+    };
+
+    if (std::holds_alternative<typename[:found_type_meta:]>(message)) {
+      run_for_handlers(message_handlers.at(type), message);
+    }
+  }
+
   // When rabbitmq receives a message, it gets handled by ALL handlers of this
   // type of the message.
   std::map<Message::MessageType, std::vector<std::shared_ptr<Handler>>>

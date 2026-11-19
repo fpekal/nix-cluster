@@ -2,9 +2,11 @@
 
 #include <algorithm>
 #include <chrono>
+#include <ranges>
 #include <string>
 
 #include <nlohmann/json.hpp>
+#include <variant>
 
 #include "util.h"
 
@@ -239,34 +241,9 @@ bool MessageDispatcher::unbind_handler(Message::MessageType type,
 }
 
 void MessageDispatcher::dispatch(const AllMessagesVariant &message) {
-  // Run all handlers of some type
-  auto run_for_handlers = [](std::vector<std::shared_ptr<Handler>> &handlers,
-                             const AllMessagesVariant &message) {
-    auto handlers_copy = handlers;
-    for (auto &handler : handlers_copy) {
-      (*handler)(&handler, message);
-    }
-  };
-
-  // Checks message type and runs `run_for_handlers` for that message type
-  if (std::holds_alternative<MessageInitializeBuilder>(message)) {
-    run_for_handlers(message_handlers.at(Message::INITIALIZE_BUILDER), message);
-  } else if (std::holds_alternative<MessageTaskRequest>(message)) {
-    run_for_handlers(message_handlers.at(Message::TASK_REQUEST), message);
-  } else if (std::holds_alternative<MessageTaskRequestResponse>(message)) {
-    run_for_handlers(message_handlers.at(Message::TASK_REQUEST_RESPONSE),
-                     message);
-  } else if (std::holds_alternative<MessageTaskCompleted>(message)) {
-    run_for_handlers(message_handlers.at(Message::TASK_COMPLETED), message);
-  } else if (std::holds_alternative<MessageLog>(message)) {
-    run_for_handlers(message_handlers.at(Message::LOG), message);
-  } else if (std::holds_alternative<MessagePing>(message)) {
-    run_for_handlers(message_handlers.at(Message::PING), message);
-  } else if (std::holds_alternative<MessagePong>(message)) {
-    run_for_handlers(message_handlers.at(Message::PONG), message);
-  } else if (std::holds_alternative<MessageDiscovery>(message)) {
-    run_for_handlers(message_handlers.at(Message::DISCOVERY), message);
-  } else if (std::holds_alternative<MessageDiscoveryResponse>(message)) {
-    run_for_handlers(message_handlers.at(Message::DISCOVERY_RESPONSE), message);
+  // Iterate over all MessageType enum values and run `dispatch_for_type` for it
+  template for (constexpr auto mes_type :
+                get_all_enum_values<Message::MessageType>()) {
+    dispatch_for_type<mes_type>(message);
   }
 }

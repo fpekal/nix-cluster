@@ -29,3 +29,17 @@ template <class Enum> constexpr std::span<const Enum> get_all_enum_values() {
         return std::meta::extract<Enum>(value);
       }));
 }
+
+constexpr char toupper(char c) {
+  if (c >= 'a' && c <= 'z')
+    return c - 'a' + 'A';
+
+  return c;
+}
+
+constexpr char tolower(char c) {
+  if (c >= 'A' && c <= 'Z')
+    return c - 'A' + 'a';
+
+  return c;
+}

@@ -1,3 +1,10 @@
+# Protokół komunikacyjny między serwerem a generatorem zadań
+Serwer tworzy 2 named pipe'y i uruchamia generator zadań
+`nix run flake#generator -- input_pipe output_pipe`
+
+`input_pipe` służy do przekazywania informacji z generatora do serwera,
+a `output_pipe` do przekazywania z serwera do generatora.
+
 # Protokół komunikacyjny między serwerem a builderami
 Cała komunikacja odbywa się przez AMQP z RabbitMQ jako broker.
 
@@ -145,6 +152,38 @@ Status to może być: "idle", "working"
 	"name": "human readable name",
 	"client_config": "{...}",
 	"status": "status"
+  }
+}
+```
+
+# Get builders
+Zwraca listę wszystkich builderów z ich statusami, konfiguracją itp.
+Wykorzystywane przez generatory, żeby wygenerować taska z template dla danego buildera.
+```json
+{
+  "message_uuid": "message_uuid_v4",
+  "sender": "client_uuid",
+  "type": "get_builders"
+}
+```
+
+# Get builders response
+Odpowiedź na `get_builders`
+```json
+{
+  "message_uuid": "message_uuid_v4",
+  "sender": "client_uuid",
+  "type": "get_builders_response",
+  "content": {
+	"request_uuid": "request_uuid",
+	"builders": [
+	  {
+		"name": "builder name",
+		"client_config": "{...}",
+		"status": "status"
+	  },
+	  {...}
+	]
   }
 }
 ```

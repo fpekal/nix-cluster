@@ -5,5 +5,5 @@
 pkgs.stdenv.mkDerivation {
   name = "server";
   src = ./.;
-  buildInputs = [core];
+  buildInputs = [core pkgs.nlohmann_json];
 }

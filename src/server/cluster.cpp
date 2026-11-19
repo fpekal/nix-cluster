@@ -1,16 +1,98 @@
 #include "cluster.h"
 
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <future>
+#include <memory>
+#include <stop_token>
+#include <sys/stat.h>
 #include <thread>
 #include <variant>
 #include <vector>
 
 #include <logger.h>
+#include <message.h>
+#include <nlohmann/json.hpp>
 #include <util.h>
 #include <uuid.h>
 
+Generator::Generator(std::shared_ptr<TaskSet> task_set, RabbitMQ *rabbitmq)
+    : task_set{task_set}, rabbitmq{rabbitmq} {
+  auto temp_directory = std::filesystem::temp_directory_path();
+  pipes_dir = temp_directory / std::string{UUID::generate()};
+
+  std::filesystem::create_directory(pipes_dir);
+
+  input_pipe = pipes_dir / "input";
+  output_pipe = pipes_dir / "output";
+
+  // Create named pipes
+  mknod(std::string{input_pipe}.c_str(), S_IFIFO | S_IRUSR | S_IWUSR, 0);
+  mknod(std::string{output_pipe}.c_str(), S_IFIFO | S_IRUSR | S_IWUSR, 0);
+
+  message_dispatcher.bind_handler(
+      Message::LOG, std::make_shared<MessageDispatcher::Handler>(
+                        [](void *, const AllMessagesVariant &message) {
+                          const MessageLog &m = std::get<MessageLog>(message);
+
+                          Logger::get_logger().log_raw(
+                              INFO, "[Generator Joshua] {}", m.content.message);
+                        }));
+}
+
+Generator::~Generator() {
+  std::filesystem::remove(output_pipe);
+  std::filesystem::remove(input_pipe);
+
+  std::filesystem::remove(pipes_dir);
+
+  if (generator_stream != nullptr) {
+    pclose(generator_stream);
+  }
+}
+
+void Generator::run() {
+  IPC_thread =
+      std::jthread(std::bind_front<&Generator::IPC_thread_handler>(this));
+
+  generator_stream = popen(
+      std::format("nix run {}#generator -- \"{}\" \"{}\"", task_set->flake_url,
+                  std::string{input_pipe}, std::string{output_pipe})
+          .c_str(),
+      "r");
+}
+
+void Generator::IPC_thread_handler(std::stop_token stop_token) {
+  std::ifstream input{input_pipe};
+
+  try {
+    while (!stop_token.stop_requested()) {
+      nlohmann::json json;
+      input >> json;
+
+      auto message = json_to_message(json.dump());
+
+      message_dispatcher.dispatch(message.value());
+    }
+  } catch (nlohmann::json::exception &e) {
+    // `input` returned empty string
+    // so the generator has died
+    // Or generator returned invalid json
+    //
+    // Is this exception a bug? I don't think so?
+    // It works... and it's not a likely branch of the program
+    //
+    // When such error occurs, stop listening to more messages.
+  }
+}
+
 Cluster::Cluster(std::string_view url) : rabbitmq{url} {
+  auto task_set = std::make_shared<TaskSet>();
+  task_set->flake_url = ".";
+  Generator g{task_set, &rabbitmq};
+  g.run();
+
   heartbeat_thread =
       std::jthread{std::bind_front<&Cluster::heartbeat_thread_handler>(this)};
 

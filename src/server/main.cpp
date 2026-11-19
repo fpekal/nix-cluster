@@ -3,12 +3,12 @@
 #include <thread>
 #include <variant>
 
+#include <builder.h>
 #include <logger.h>
 #include <message.h>
 #include <rabbitmq.h>
 #include <uuid.h>
 
-#include "builder.h"
 #include "cluster.h"
 
 int main() {

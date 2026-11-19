@@ -2,14 +2,17 @@
 #include <map>
 #include <string>
 
-#include <message.h>
+enum BuilderStatus {
+  IDLE,
+  WORKING,
+};
 
 class BuilderInfo {
 public:
   std::string uuid;
   std::string name;
   std::string client_config;
-  Message::BuilderStatus status = Message::IDLE;
+  BuilderStatus status = IDLE;
 };
 
 // Map of uuid -> BuilderInfo

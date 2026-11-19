@@ -4,10 +4,9 @@
 #include <stop_token>
 #include <thread>
 
+#include <builder.h>
 #include <message.h>
 #include <rabbitmq.h>
-
-#include "builder.h"
 
 class Cluster {
 public:

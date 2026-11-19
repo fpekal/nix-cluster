@@ -40,7 +40,7 @@ std::string Message::builder_status_to_str(BuilderStatus builder_status) {
   return "";
 }
 
-Message::BuilderStatus Message::str_to_builder_status(std::string_view str) {
+BuilderStatus Message::str_to_builder_status(std::string_view str) {
   static constexpr auto conv_array =
       generate_enum_to_string_view_array<BuilderStatus>();
 

@@ -12,6 +12,8 @@
 #include <variant>
 #include <vector>
 
+#include "builder.h"
+
 // Messages sent between the server and the clients
 class Message {
 public:
@@ -32,10 +34,6 @@ public:
   };
   static std::string message_type_to_str(MessageType mes_type);
 
-  enum BuilderStatus {
-    IDLE,
-    WORKING,
-  };
   static std::string builder_status_to_str(BuilderStatus builder_status);
   static BuilderStatus str_to_builder_status(std::string_view str);
 

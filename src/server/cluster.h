@@ -1,4 +1,5 @@
 #pragma once
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <stop_token>
@@ -8,10 +9,75 @@
 #include <message.h>
 #include <rabbitmq.h>
 
+class Cluster;
+
+// Basically what clients send to the server.
+// Contains url to the flake with task generator and task template
+class TaskSet {
+public:
+  std::string flake_url;
+};
+
+// Task on the builder
+class Task {
+public:
+  Task(std::shared_ptr<TaskSet> task_set, ServerRabbitMQ *rabbitmq,
+       Cluster *cluster, std::string_view builder_uuid,
+       std::string_view client_config, std::string_view task_input);
+
+  std::shared_ptr<TaskSet> task_set;
+
+  void build();
+  bool has_completed();
+
+private:
+  std::string client_config;
+  std::string task_input;
+  std::string builder_uuid;
+  ServerRabbitMQ *rabbitmq;
+  Cluster *cluster;
+
+  std::atomic<bool> completed = false;
+};
+
+// Runs the generator and creates tasks
+class Generator {
+public:
+  Generator(std::shared_ptr<TaskSet> task_set, ServerRabbitMQ *rabbitmq,
+            Cluster *cluster);
+  ~Generator();
+
+  void run();
+
+private:
+  void IPC_thread_handler(std::stop_token stop_token);
+
+  MessageDispatcher message_dispatcher;
+  std::vector<Task> tasks;
+
+  std::shared_ptr<TaskSet> task_set;
+  ServerRabbitMQ *rabbitmq;
+  Cluster *cluster;
+
+  std::filesystem::path pipes_dir;
+  std::filesystem::path input_pipe;
+  std::filesystem::path output_pipe;
+
+  std::jthread IPC_thread;
+  FILE *generator_stream = nullptr;
+};
+
+// Main class
+// Tracks builders, tasks on them, etc.
 class Cluster {
 public:
   Cluster(std::string_view url);
   ~Cluster();
+
+  Builders get_builders();
+  std::string get_builder_name(std::string_view uuid);
+
+  MessageDispatcher message_dispatcher;
 
 private:
   void heartbeat_thread_handler(std::stop_token stop_token);
@@ -23,8 +89,6 @@ private:
   std::mutex builders_mutex;
 
   ServerRabbitMQ rabbitmq;
-
-  MessageDispatcher message_dispatcher;
 
   // Sends heartbeat to the broker once every 5 seconds
   std::jthread heartbeat_thread;

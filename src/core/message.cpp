@@ -119,6 +119,21 @@ std::string message_to_json(const Message &mes) {
         Message::builder_status_to_str(m.content.status);
     break;
   }
+  case Message::GET_BUILDERS:
+    break;
+  case Message::GET_BUILDERS_RESPONSE: {
+    auto &m = static_cast<const MessageGetBuildersResponse &>(mes);
+    json["content"]["request_uuid"] = m.content.request_uuid;
+    for (const auto &builder : m.content.builders) {
+      nlohmann::json builder_json;
+      builder_json["uuid"] = builder.uuid;
+      builder_json["name"] = builder.name;
+      builder_json["client_config"] = builder.client_config;
+      builder_json["status"] = Message::builder_status_to_str(builder.status);
+      json.push_back(builder_json);
+    }
+    break;
+  }
   }
 
   return json.dump();
@@ -196,6 +211,22 @@ std::optional<AllMessagesVariant> json_to_message(std::string_view json) {
       mes.content.name = obj["content"]["name"];
       mes.content.status =
           Message::str_to_builder_status(obj["content"]["status"].dump());
+      return AllMessagesVariant{mes};
+    }
+    if (obj["type"] == "get_builders") {
+      MessageGetBuilders mes;
+      fill_common(mes, obj);
+      return AllMessagesVariant{mes};
+    }
+    if (obj["type"] == "get_builders_response") {
+      MessageGetBuildersResponse mes;
+      fill_common(mes, obj);
+      mes.content.request_uuid = obj["content"]["request_uuid"];
+      for (auto builder : obj["content"]["builders"]) {
+        mes.content.builders.emplace_back(
+            builder["uuid"], builder["name"], builder["client_config"],
+            Message::str_to_builder_status(builder["status"].dump()));
+      }
       return AllMessagesVariant{mes};
     }
 

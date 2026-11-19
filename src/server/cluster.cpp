@@ -1,16 +1,220 @@
 #include "cluster.h"
 
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <future>
+#include <memory>
+#include <mutex>
+#include <stop_token>
+#include <sys/stat.h>
 #include <thread>
 #include <variant>
 #include <vector>
 
 #include <logger.h>
+#include <message.h>
+#include <nlohmann/json.hpp>
 #include <util.h>
 #include <uuid.h>
 
+Task::Task(std::shared_ptr<TaskSet> task_set, ServerRabbitMQ *rabbitmq,
+           Cluster *cluster, std::string_view builder_uuid,
+           std::string_view client_config, std::string_view task_input)
+    : task_set{task_set}, rabbitmq{rabbitmq}, cluster{cluster},
+      builder_uuid{builder_uuid}, client_config{client_config},
+      task_input{task_input} {}
+
+void Task::build() {
+
+  MessageTaskRequest new_message;
+  new_message.message_uuid = UUID::generate();
+  new_message.sender = "server";
+
+  new_message.content.flake_url = task_set->flake_url;
+  new_message.content.client_config = client_config;
+  new_message.content.task_input = task_input;
+
+  auto task_completed_response_handler =
+      std::make_shared<MessageDispatcher::Handler>();
+  auto task_request_response_handler =
+      std::make_shared<MessageDispatcher::Handler>();
+
+  *task_request_response_handler =
+      [new_message, this,
+       task_request_response_handler =
+           std::weak_ptr<MessageDispatcher::Handler>{
+               task_request_response_handler},
+       task_completed_response_handler =
+           std::weak_ptr<MessageDispatcher::Handler>{
+               task_completed_response_handler}](
+          const AllMessagesVariant &message) {
+        const MessageTaskRequestResponse &m =
+            std::get<MessageTaskRequestResponse>(message);
+
+        if (m.content.request_uuid != new_message.message_uuid)
+          return;
+
+        if (m.content.response == "success") {
+          Logger::get_logger().log(INFO, "Builder {} accepted the {} task",
+                                   cluster->get_builder_name(builder_uuid),
+                                   new_message.content.flake_url);
+        } else {
+          Logger::get_logger().log(INFO, "Builder {} revoked the {} task",
+                                   cluster->get_builder_name(builder_uuid),
+                                   new_message.content.flake_url);
+          cluster->message_dispatcher.unbind_handler(
+              Message::TASK_COMPLETED, task_completed_response_handler.lock());
+        }
+
+        cluster->message_dispatcher.unbind_handler(
+            Message::TASK_REQUEST_RESPONSE,
+            task_request_response_handler.lock());
+      };
+
+  *task_completed_response_handler =
+      [new_message, this,
+       task_request_response_handler =
+           std::weak_ptr<MessageDispatcher::Handler>{
+               task_request_response_handler},
+       task_completed_response_handler =
+           std::weak_ptr<MessageDispatcher::Handler>{
+               task_completed_response_handler}](
+          const AllMessagesVariant &message) {
+        const MessageTaskCompleted &m = std::get<MessageTaskCompleted>(message);
+
+        if (m.content.request_uuid != new_message.message_uuid)
+          return;
+
+        if (m.content.response == "success") {
+          Logger::get_logger().log(INFO, "Builder {} failed the {} task",
+                                   cluster->get_builder_name(builder_uuid),
+                                   new_message.content.flake_url);
+        } else {
+          Logger::get_logger().log(INFO, "Builder {} succeded the {} task",
+                                   cluster->get_builder_name(builder_uuid),
+                                   new_message.content.flake_url);
+        }
+
+        completed = true;
+
+        cluster->message_dispatcher.unbind_handler(
+            Message::TASK_COMPLETED, task_completed_response_handler.lock());
+        cluster->message_dispatcher.unbind_handler(
+            Message::TASK_REQUEST_RESPONSE,
+            task_request_response_handler.lock());
+      };
+
+  cluster->message_dispatcher.bind_handler(Message::TASK_REQUEST_RESPONSE,
+                                           task_request_response_handler);
+
+  cluster->message_dispatcher.bind_handler(Message::TASK_COMPLETED,
+                                           task_completed_response_handler);
+
+  rabbitmq->send_message_to_one(new_message, builder_uuid);
+}
+
+bool Task::has_completed() { return completed; }
+
+Generator::Generator(std::shared_ptr<TaskSet> task_set,
+                     ServerRabbitMQ *rabbitmq, Cluster *cluster)
+    : task_set{task_set}, rabbitmq{rabbitmq}, cluster{cluster} {
+  auto temp_directory = std::filesystem::temp_directory_path();
+  pipes_dir = temp_directory / std::string{UUID::generate()};
+
+  std::filesystem::create_directory(pipes_dir);
+
+  input_pipe = pipes_dir / "input";
+  output_pipe = pipes_dir / "output";
+
+  // Create named pipes
+  mknod(std::string{input_pipe}.c_str(), S_IFIFO | S_IRUSR | S_IWUSR, 0);
+  mknod(std::string{output_pipe}.c_str(), S_IFIFO | S_IRUSR | S_IWUSR, 0);
+
+  // Response for PINGs
+  message_dispatcher.bind_handler(
+      Message::LOG, std::make_shared<MessageDispatcher::Handler>(
+                        [this](const AllMessagesVariant &message) {
+                          const MessageLog &m = std::get<MessageLog>(message);
+
+                          Logger::get_logger().log_raw(
+                              INFO, "[Generator {}] {}",
+                              this->task_set->flake_url, m.content.message);
+                        }));
+
+  // Return all builders info when the generator asks for it
+  message_dispatcher.bind_handler(
+      Message::GET_BUILDERS,
+      std::make_shared<MessageDispatcher::Handler>(
+          [this](const AllMessagesVariant &message) {
+            const MessageGetBuilders &m = std::get<MessageGetBuilders>(message);
+
+            MessageGetBuildersResponse new_message;
+            new_message.message_uuid = UUID::generate();
+            new_message.sender = "server";
+            new_message.content.request_uuid = m.message_uuid;
+
+            for (auto builder : this->cluster->get_builders()) {
+              new_message.content.builders.push_back(builder.second);
+            }
+
+            this->rabbitmq->send_message_to_one(new_message, m.sender);
+          }));
+}
+
+Generator::~Generator() {
+  std::filesystem::remove(output_pipe);
+  std::filesystem::remove(input_pipe);
+
+  std::filesystem::remove(pipes_dir);
+
+  if (generator_stream != nullptr) {
+    pclose(generator_stream);
+  }
+}
+
+void Generator::run() {
+  IPC_thread =
+      std::jthread(std::bind_front<&Generator::IPC_thread_handler>(this));
+
+  std::string formatted = std::format(
+      "nix run \"{}#generator\" -- \"{}\" \"{}\"", task_set->flake_url,
+      std::string{input_pipe}, std::string{output_pipe});
+  Logger::get_logger().log(DEBUG, "Running generator with: `{}`", formatted);
+
+  generator_stream = popen(formatted.c_str(), "r");
+}
+
+void Generator::IPC_thread_handler(std::stop_token stop_token) {
+  std::ifstream input{input_pipe};
+
+  try {
+    while (!stop_token.stop_requested()) {
+      nlohmann::json json;
+      input >> json;
+
+      auto message = json_to_message(json.dump());
+
+      message_dispatcher.dispatch(message.value());
+    }
+  } catch (nlohmann::json::exception &e) {
+    // `input` returned empty string
+    // so the generator has died
+    // Or generator returned invalid json
+    //
+    // Is this exception a bug? I don't think so?
+    // It works... and it's not a likely branch of the program
+    //
+    // When such error occurs, stop listening to more messages.
+  }
+}
+
 Cluster::Cluster(std::string_view url) : rabbitmq{url} {
+  auto task_set = std::make_shared<TaskSet>();
+  task_set->flake_url = ".";
+  Generator g{task_set, &rabbitmq, this};
+  g.run();
+
   heartbeat_thread =
       std::jthread{std::bind_front<&Cluster::heartbeat_thread_handler>(this)};
 
@@ -86,15 +290,7 @@ Cluster::Cluster(std::string_view url) : rabbitmq{url} {
                         [this](const AllMessagesVariant &message) {
                           auto &m = std::get<MessageLog>(message);
 
-                          std::string builder_name = "";
-                          {
-                            auto found = builders.find(m.sender);
-                            if (found == builders.end()) {
-                              builder_name = m.sender;
-                            } else {
-                              builder_name = found->second.name;
-                            }
-                          }
+                          std::string builder_name = get_builder_name(m.sender);
 
                           Logger::get_logger().log_raw(
                               LoggerLevel::INFO, "[\e[0;33mBuilder {}\e[0m] {}",
@@ -120,6 +316,27 @@ void Cluster::heartbeat_thread_handler(std::stop_token stop_token) {
 
     rabbitmq.heartbeat();
   }
+}
+
+Builders Cluster::get_builders() {
+  std::lock_guard guard{builders_mutex};
+  return builders;
+}
+
+std::string Cluster::get_builder_name(std::string_view uuid) {
+  std::string builder_name = "";
+  {
+    std::lock_guard guard{builders_mutex};
+    auto found = builders.find(std::string{uuid});
+
+    if (found == builders.end()) {
+      builder_name = uuid;
+    } else {
+      builder_name = found->second.name;
+    }
+  }
+
+  return builder_name;
 }
 
 void Cluster::remove_dead_thread_handler(std::stop_token stop_token) {

@@ -33,6 +33,9 @@ public:
 
     DISCOVERY,
     DISCOVERY_RESPONSE,
+
+    GET_BUILDERS,
+    GET_BUILDERS_RESPONSE,
   };
   static std::string message_type_to_str(MessageType mes_type);
 
@@ -129,6 +132,21 @@ public:
     std::string name = "";
     std::string client_config = "";
     BuilderStatus status;
+  } content;
+};
+
+class MessageGetBuilders : public Message {
+public:
+  MessageGetBuilders() { type = GET_BUILDERS; }
+};
+
+class MessageGetBuildersResponse : public Message {
+public:
+  MessageGetBuildersResponse() { type = GET_BUILDERS_RESPONSE; }
+
+  struct {
+    std::string request_uuid = "";
+    std::vector<BuilderInfo> builders;
   } content;
 };
 

@@ -21,7 +21,7 @@ Inicjalizacja buildera wymaga wysłania do wiadomości:
   "type": "initialize_builder",
   "content": {
 	"name": "human readable name",
-	"client_config": {...}
+	"client_config": "{...}"
   }
 }
 ```
@@ -47,8 +47,8 @@ Kiedy serwer zdecyduje się poprosić jakiegoś buildera o wykonanie zadania, wy
   "type": "task_request",
   "content": {
 	"flake_url": "https://example.com/"
-	"client_config": "{nix: \"expression\"}",
-	"task_input": "{another_nix: \"expression\"}"
+	"client_config": "{nix = \"expression\"}",
+	"task_input": "{another_nix = \"expression\"}"
   }
 }
 ```
@@ -143,7 +143,7 @@ Status to może być: "idle", "working"
   "content": {
 	"request_uuid": "server_message_uuid",
 	"name": "human readable name",
-	"client_config": {...},
+	"client_config": "{...}",
 	"status": "status"
   }
 }

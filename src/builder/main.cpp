@@ -55,7 +55,7 @@ int main() {
             new_message.content.request_uuid = m.message_uuid;
             new_message.content.name = "Joshua";
             new_message.content.client_config = "{amo=\"gus\";}";
-            new_message.content.status = Message::IDLE;
+            new_message.content.status = BuilderStatus::IDLE;
 
             rabbitmq.send_message(new_message);
             Logger::get_logger().log(DEBUG, "Sent DISCOVERY_RESPONSE");

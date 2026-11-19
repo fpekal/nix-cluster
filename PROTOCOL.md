@@ -1,4 +1,4 @@
-# Protokół komunikacyjny między serwerem a klientami
+# Protokół komunikacyjny między serwerem a builderami
 Cała komunikacja odbywa się przez AMQP z RabbitMQ jako broker.
 
 Serwer wysyła swoje wiadomości do exchange o nazwie "builders".
@@ -28,7 +28,7 @@ Inicjalizacja buildera wymaga wysłania do wiadomości:
 
 `message_uuid` identyfikuje wiadomość. Używane do odpowiadania
 `name` to niekoniecznie unikalna nazwa używana w logach
-`client_config` to customowe informacje DLA SERWERA o kliencie.
+`client_config` to customowe informacje DLA SERWERA o builderze.
 Serwer używa tej informacji żeby samemu wygenerować `client_config`
 wysyłany razem z taskiem.
 Można też użyć tej informacji, żeby dynamicznie móc wybierać który task
@@ -39,7 +39,7 @@ wczesniej serwery mogły natychmiastowo wykryć nowo połączonych builderów,
 bez potrzeby ciągłego wysyłania wiadomości `discovery`.
 
 # Wysyłanie tasków
-Kiedy serwer zdecyduje się poprosić jakiegoś klienta o wykonanie zadania, wysyła mu wiadomość:
+Kiedy serwer zdecyduje się poprosić jakiegoś buildera o wykonanie zadania, wysyła mu wiadomość:
 ```json
 {
   "message_uuid": "message_uuid_v4",
@@ -54,7 +54,7 @@ Kiedy serwer zdecyduje się poprosić jakiegoś klienta o wykonanie zadania, wys
 ```
 
 # Odbieranie tasków
-Kiedy klient odbierze task, to wysyła odpowiedź:
+Kiedy builder odbierze task, to wysyła odpowiedź:
 ```json
 {
   "message_uuid"": "message_uuid_v4",
@@ -67,10 +67,10 @@ Kiedy klient odbierze task, to wysyła odpowiedź:
 }
 ```
 
-Klient zaczyna wykonywać task
+Builder zaczyna wykonywać task
 
 # Wysyłanie logów
-Klient może w dowolnym momencie po połączeniu wysłać tekst do serwera, żeby ten wpisał go do logów:
+Builder może w dowolnym momencie po połączeniu wysłać tekst do serwera, żeby ten wpisał go do logów:
 ```json
 {
   "message_uuid": "message_uuid_v4",
@@ -82,10 +82,10 @@ Klient może w dowolnym momencie po połączeniu wysłać tekst do serwera, żeb
 }
 ```
 
-Serwer zapisze go w logach, dopisując przy tym nazwę klienta, od którego dostał tę wiadomość.
+Serwer zapisze go w logach, dopisując przy tym nazwę buildera, od którego dostał tę wiadomość.
 
 # Wynik wykonywania taska
-Kiedy klient skończy wykonywać taska (nieważne, czy zakończono go pozytywnie, czy nie), wysyła do serwera wynik:
+Kiedy builder skończy wykonywać taska (nieważne, czy zakończono go pozytywnie, czy nie), wysyła do serwera wynik:
 ```json
 {
   "message_uuid": "message_uuid_v4",
@@ -100,7 +100,7 @@ Kiedy klient skończy wykonywać taska (nieważne, czy zakończono go pozytywnie
 ```
 
 # Ping pong
-Serwer i klienci mogą w każdej chwili poprosić drugą stronę o odpowiedzenie na ping.
+Serwer i builderzy mogą w każdej chwili poprosić drugą stronę o odpowiedzenie na ping.
 ```json
 {
   "message_uuid": "message_uuid_v4",
@@ -133,7 +133,7 @@ Ta wiadomość wysyłana jest z `routing_key` ustawionym na "builder.broadcast".
 ```
 
 # Discovery response
-Odpowiedź na zapytanie z konfiguracją klienta i czy aktualnie rozwiązuje jakiegoś taska.
+Odpowiedź na zapytanie z konfiguracją buildera i czy aktualnie rozwiązuje jakiegoś taska.
 Status to może być: "idle", "working"
 ```json
 {

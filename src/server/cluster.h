@@ -11,19 +11,8 @@
 
 class Cluster {
 public:
-  typedef std::function<void(void *, const AllMessagesVariant &)> Handler;
-
   Cluster(std::string_view url);
   ~Cluster();
-
-  // All handlers are run when some kind of message is received.
-  void bind_handler(Message::MessageType type,
-                    std::shared_ptr<Handler> handler);
-
-  // `handler` is the value returned by the `bind_handler()` function.
-  // Returns true if the handler was found and unbound.
-  bool unbind_handler(Message::MessageType type,
-                      std::shared_ptr<Handler> handler);
 
 private:
   void heartbeat_thread_handler(std::stop_token stop_token);
@@ -36,11 +25,7 @@ private:
 
   ServerRabbitMQ rabbitmq;
 
-  // When rabbitmq receives a message, it gets handled by ALL handlers of this
-  // type of the message.
-  std::map<Message::MessageType, std::vector<std::shared_ptr<Handler>>>
-      message_handlers;
-  std::mutex message_handlers_mutex;
+  MessageDispatcher message_dispatcher;
 
   // Sends heartbeat to the broker once every 5 seconds
   std::jthread heartbeat_thread;

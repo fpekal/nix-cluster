@@ -1,9 +1,14 @@
 #pragma once
 #include <chrono>
+#include <functional>
+#include <map>
+#include <memory>
 #include <meta>
+#include <mutex>
 #include <optional>
 #include <ranges>
 #include <string>
+#include <thread>
 #include <variant>
 #include <vector>
 
@@ -157,3 +162,29 @@ using AllMessagesVariant = [:std::meta::substitute(^^std::variant,
 
 std::string message_to_json(const Message &mes);
 std::optional<AllMessagesVariant> json_to_message(std::string_view json);
+
+// Allows binding handlers that will run when some message type will arrive
+class MessageDispatcher {
+public:
+  typedef std::function<void(void *, const AllMessagesVariant &)> Handler;
+
+  MessageDispatcher();
+
+  // All handlers are run when some kind of message is received.
+  void bind_handler(Message::MessageType type,
+                    std::shared_ptr<Handler> handler);
+
+  // `handler` is the value returned by the `bind_handler()` function.
+  // Returns true if the handler was found and unbound.
+  bool unbind_handler(Message::MessageType type,
+                      std::shared_ptr<Handler> handler);
+
+  void dispatch(const AllMessagesVariant &message);
+
+private:
+  // When rabbitmq receives a message, it gets handled by ALL handlers of this
+  // type of the message.
+  std::map<Message::MessageType, std::vector<std::shared_ptr<Handler>>>
+      message_handlers;
+  std::mutex message_handlers_mutex;
+};

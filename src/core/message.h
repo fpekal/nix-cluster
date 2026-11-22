@@ -166,7 +166,7 @@ std::optional<AllMessagesVariant> json_to_message(std::string_view json);
 // Allows binding handlers that will run when some message type will arrive
 class MessageDispatcher {
 public:
-  typedef std::function<void(void *, const AllMessagesVariant &)> Handler;
+  typedef std::function<void(const AllMessagesVariant &)> Handler;
 
   MessageDispatcher();
 
@@ -250,7 +250,7 @@ private:
                                const AllMessagesVariant &message) {
       auto handlers_copy = handlers;
       for (auto &handler : handlers_copy) {
-        (*handler)(&handler, message);
+        (*handler)(message);
       }
     };
 

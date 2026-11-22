@@ -28,7 +28,7 @@ Cluster::Cluster(std::string_view url) : rabbitmq{url} {
   message_dispatcher.bind_handler(
       Message::INITIALIZE_BUILDER,
       std::make_shared<MessageDispatcher::Handler>(
-          [this](void *, const AllMessagesVariant &message) {
+          [this](const AllMessagesVariant &message) {
             auto &m = std::get<MessageInitializeBuilder>(message);
 
             Logger::get_logger().log(INFO, "Builder {} connected",
@@ -47,7 +47,7 @@ Cluster::Cluster(std::string_view url) : rabbitmq{url} {
   message_dispatcher.bind_handler(
       Message::DISCOVERY_RESPONSE,
       std::make_shared<MessageDispatcher::Handler>(
-          [this](void *, const AllMessagesVariant &message) {
+          [this](const AllMessagesVariant &message) {
             auto &m = std::get<MessageDiscoveryResponse>(message);
 
             std::lock_guard guard{builders_mutex};
@@ -67,7 +67,7 @@ Cluster::Cluster(std::string_view url) : rabbitmq{url} {
   // Respond to PINGs with PONGs
   message_dispatcher.bind_handler(
       Message::PING, std::make_shared<MessageDispatcher::Handler>(
-                         [this](void *, const AllMessagesVariant &message) {
+                         [this](const AllMessagesVariant &message) {
                            auto &m = std::get<MessagePing>(message);
 
                            MessagePong new_message;
@@ -83,7 +83,7 @@ Cluster::Cluster(std::string_view url) : rabbitmq{url} {
   // Put into local logs all logs sent by builders
   message_dispatcher.bind_handler(
       Message::LOG, std::make_shared<MessageDispatcher::Handler>(
-                        [this](void *, const AllMessagesVariant &message) {
+                        [this](const AllMessagesVariant &message) {
                           auto &m = std::get<MessageLog>(message);
 
                           std::string builder_name = "";
@@ -150,11 +150,13 @@ void Cluster::remove_dead_thread_handler(std::stop_token stop_token) {
       std::future future = promise.get_future();
 
       // Listen to the PONG message
-      auto pong_handler_fn = std::make_shared<MessageDispatcher::Handler>(
-          [this, &promise,
-           ping_message_uuid](void *self, const AllMessagesVariant &message) {
-            auto this_handler = *reinterpret_cast<
-                std::shared_ptr<MessageDispatcher::Handler> *>(self);
+      std::shared_ptr<MessageDispatcher::Handler> pong_handler_fn =
+          std::make_shared<MessageDispatcher::Handler>();
+
+      *pong_handler_fn =
+          [this, &promise, ping_message_uuid,
+           pong_handler_fn = std::weak_ptr<MessageDispatcher::Handler>{
+               pong_handler_fn}](const AllMessagesVariant &message) {
             auto &m = std::get<MessagePong>(message);
 
             // If it's some other PONG message, ignore it
@@ -166,8 +168,9 @@ void Cluster::remove_dead_thread_handler(std::stop_token stop_token) {
 
             // It was this builder.
             // Stop listening for more PONGs
-            message_dispatcher.unbind_handler(Message::PONG, this_handler);
-          });
+            message_dispatcher.unbind_handler(Message::PONG,
+                                              pong_handler_fn.lock());
+          };
       message_dispatcher.bind_handler(Message::PONG, pong_handler_fn);
 
       // Send message to the builder so it can respond to us

@@ -29,7 +29,7 @@ int main() {
   message_dispatcher.bind_handler(
       Message::PING,
       std::make_shared<MessageDispatcher::Handler>(
-          [client_uuid, &rabbitmq](void *, const AllMessagesVariant &message) {
+          [client_uuid, &rabbitmq](const AllMessagesVariant &message) {
             Logger::get_logger().log(DEBUG, "Got PING");
             auto &m = std::get<MessagePing>(message);
             MessagePong new_message;
@@ -46,7 +46,7 @@ int main() {
   message_dispatcher.bind_handler(
       Message::DISCOVERY,
       std::make_shared<MessageDispatcher::Handler>(
-          [client_uuid, &rabbitmq](void *, const AllMessagesVariant &message) {
+          [client_uuid, &rabbitmq](const AllMessagesVariant &message) {
             Logger::get_logger().log(DEBUG, "Got DISCOVERY");
             auto &m = std::get<MessageDiscovery>(message);
             MessageDiscoveryResponse new_message;

@@ -158,7 +158,107 @@ Generator::Generator(std::shared_ptr<TaskSet> task_set,
               new_message.content.builders.push_back(builder.second);
             }
 
-            this->rabbitmq->send_message_to_one(new_message, m.sender);
+            send_message(new_message);
+          }));
+
+  // Send a new task to the specific builder
+  message_dispatcher.bind_handler(
+      Message::GENERATOR_TASK_REQUEST,
+      std::make_shared<MessageDispatcher::Handler>(
+          [this](const AllMessagesVariant &message) {
+            const MessageGeneratorTaskRequest &m =
+                std::get<MessageGeneratorTaskRequest>(message);
+
+            MessageTaskRequest new_message;
+            new_message.message_uuid = UUID::generate();
+            new_message.sender = "server";
+            new_message.content.flake_url = m.content.flake_url;
+            new_message.content.client_config = m.content.client_config;
+            new_message.content.task_input = m.content.task_input;
+
+            auto task_completed_fn =
+                std::make_shared<MessageDispatcher::Handler>();
+            auto task_request_fn =
+                std::make_shared<MessageDispatcher::Handler>();
+            *task_request_fn =
+                [new_message, this,
+                 task_request_fn =
+                     std::weak_ptr<MessageDispatcher::Handler>{task_request_fn},
+                 task_completed_fn = std::weak_ptr<MessageDispatcher::Handler>{
+                     task_completed_fn}](const AllMessagesVariant &message) {
+                  const MessageTaskRequestResponse &m =
+                      std::get<MessageTaskRequestResponse>(message);
+
+                  if (m.content.request_uuid != new_message.message_uuid)
+                    return;
+
+                  if (m.content.response != "success") {
+                    this->cluster->message_dispatcher.unbind_handler(
+                        Message::TASK_COMPLETED, task_completed_fn.lock());
+                  }
+
+                  MessageGeneratorTaskRequestResponse new_message_gen;
+                  new_message_gen.message_uuid = UUID::generate();
+                  new_message_gen.sender = "server";
+                  new_message_gen.content.request_uuid = m.content.request_uuid;
+                  new_message_gen.content.response = m.content.response;
+
+                  send_message(new_message_gen);
+
+                  this->cluster->message_dispatcher.unbind_handler(
+                      Message::TASK_REQUEST_RESPONSE, task_request_fn.lock());
+                };
+
+            *task_completed_fn =
+                [new_message, this,
+                 task_request_fn =
+                     std::weak_ptr<MessageDispatcher::Handler>{task_request_fn},
+                 task_completed_fn = std::weak_ptr<MessageDispatcher::Handler>{
+                     task_completed_fn}](const AllMessagesVariant &message) {
+                  const MessageTaskCompleted &m =
+                      std::get<MessageTaskCompleted>(message);
+
+                  if (m.content.request_uuid != new_message.message_uuid)
+                    return;
+
+                  MessageGeneratorTaskCompleted new_message_gen;
+                  new_message_gen.message_uuid = UUID::generate();
+                  new_message_gen.sender = "server";
+                  new_message_gen.content.request_uuid = m.content.request_uuid;
+                  new_message_gen.content.response = m.content.response;
+
+                  send_message(new_message_gen);
+
+                  this->cluster->message_dispatcher.unbind_handler(
+                      Message::TASK_COMPLETED, task_completed_fn.lock());
+                  this->cluster->message_dispatcher.unbind_handler(
+                      Message::TASK_REQUEST_RESPONSE, task_request_fn.lock());
+                };
+
+            this->cluster->message_dispatcher.bind_handler(
+                Message::TASK_REQUEST_RESPONSE, task_request_fn);
+
+            this->cluster->message_dispatcher.bind_handler(
+                Message::TASK_COMPLETED, task_completed_fn);
+
+            this->rabbitmq->send_message_to_one(new_message,
+                                                m.content.builder_uuid);
+          }));
+
+  message_dispatcher.bind_handler(
+      Message::GENERATOR_TASK_CANCEL,
+      std::make_shared<MessageDispatcher::Handler>(
+          [this](const AllMessagesVariant &message) {
+            const MessageGeneratorTaskCancel &m =
+                std::get<MessageGeneratorTaskCancel>(message);
+
+            MessageTaskCancel new_message;
+            new_message.message_uuid = UUID::generate();
+            new_message.sender = "server";
+            new_message.content.task_uuid = m.content.task_uuid;
+
+            this->rabbitmq->send_message_to_one(new_message,
+                                                m.content.builder_uuid);
           }));
 }
 
@@ -174,8 +274,10 @@ Generator::~Generator() {
 }
 
 void Generator::run() {
-  IPC_thread =
-      std::jthread(std::bind_front<&Generator::IPC_thread_handler>(this));
+  IPC_input_thread =
+      std::jthread(std::bind_front<&Generator::IPC_input_thread_handler>(this));
+  IPC_output_thread = std::jthread(
+      std::bind_front<&Generator::IPC_output_thread_handler>(this));
 
   std::string formatted = std::format(
       "nix run \"{}#generator\" -- \"{}\" \"{}\"", task_set->flake_url,
@@ -185,7 +287,7 @@ void Generator::run() {
   generator_stream = popen(formatted.c_str(), "r");
 }
 
-void Generator::IPC_thread_handler(std::stop_token stop_token) {
+void Generator::IPC_input_thread_handler(std::stop_token stop_token) {
   std::ifstream input{input_pipe};
 
   try {
@@ -207,6 +309,37 @@ void Generator::IPC_thread_handler(std::stop_token stop_token) {
     //
     // When such error occurs, stop listening to more messages.
   }
+}
+
+void Generator::IPC_output_thread_handler(std::stop_token stop_token) {
+  std::ofstream output{output_pipe};
+
+  std::unique_lock lock{output_queue_mutex};
+
+  while (!stop_token.stop_requested()) {
+    output_queue_cv.wait_for(lock, std::chrono::seconds{5},
+                             [this]() { return !output_queue.empty(); });
+
+    // Better to be sure
+    if (output_queue.empty())
+      continue;
+
+    AllMessagesVariant message = output_queue.back();
+    output_queue.pop();
+
+    lock.unlock();
+
+    output << message_to_json(*reinterpret_cast<Message *>(&message));
+
+    lock.lock();
+  }
+}
+
+void Generator::send_message(const AllMessagesVariant &message) {
+  std::lock_guard lock{output_queue_mutex};
+
+  output_queue.push(message);
+  output_queue_cv.notify_one();
 }
 
 Cluster::Cluster(std::string_view url) : rabbitmq{url} {

@@ -25,6 +25,7 @@ public:
     TASK_REQUEST,
     TASK_REQUEST_RESPONSE,
     TASK_COMPLETED,
+    TASK_CANCEL,
 
     LOG,
 
@@ -36,6 +37,11 @@ public:
 
     GET_BUILDERS,
     GET_BUILDERS_RESPONSE,
+
+    GENERATOR_TASK_REQUEST,
+    GENERATOR_TASK_REQUEST_RESPONSE,
+    GENERATOR_TASK_COMPLETED,
+    GENERATOR_TASK_CANCEL,
   };
   static std::string message_type_to_str(MessageType mes_type);
 
@@ -94,6 +100,15 @@ public:
   } content;
 };
 
+class MessageTaskCancel : public Message {
+public:
+  MessageTaskCancel() { type = TASK_COMPLETED; }
+
+  struct {
+    std::string task_uuid = "";
+  } content;
+};
+
 class MessageLog : public Message {
 public:
   MessageLog() { type = LOG; }
@@ -147,6 +162,51 @@ public:
   struct {
     std::string request_uuid = "";
     std::vector<BuilderInfo> builders;
+  } content;
+};
+
+class MessageGeneratorTaskRequest : public Message {
+public:
+  MessageGeneratorTaskRequest() { type = GENERATOR_TASK_REQUEST; }
+
+  struct {
+    std::string builder_uuid = "";
+    std::string flake_url = "";
+    std::string client_config = "";
+    std::string task_input = "";
+  } content;
+};
+
+class MessageGeneratorTaskRequestResponse : public Message {
+public:
+  MessageGeneratorTaskRequestResponse() {
+    type = GENERATOR_TASK_REQUEST_RESPONSE;
+  }
+
+  struct {
+    std::string request_uuid = "";
+    std::string response = "";
+  } content;
+};
+
+class MessageGeneratorTaskCompleted : public Message {
+public:
+  MessageGeneratorTaskCompleted() { type = GENERATOR_TASK_COMPLETED; }
+
+  struct {
+    std::string request_uuid = "";
+    std::string response = "";
+    std::string result = "";
+  } content;
+};
+
+class MessageGeneratorTaskCancel : public Message {
+public:
+  MessageGeneratorTaskCancel() { type = GENERATOR_TASK_CANCEL; }
+
+  struct {
+    std::string builder_uuid = "";
+    std::string task_uuid = "";
   } content;
 };
 

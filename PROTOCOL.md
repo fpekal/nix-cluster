@@ -106,6 +106,19 @@ Kiedy builder skończy wykonywać taska (nieważne, czy zakończono go pozytywni
 }
 ```
 
+# Task cancel
+Anuluj wykonywanie taska na builderze
+```json
+{
+  "message_uuid": "message_uuid_v4",
+  "sender": "generator",
+  "type": "task_cancel",
+  "content": {
+	"task_uuid": "task request uuid",
+  }
+}
+```
+
 # Ping pong
 Serwer i builderzy mogą w każdej chwili poprosić drugą stronę o odpowiedzenie na ping.
 ```json
@@ -184,6 +197,65 @@ Odpowiedź na `get_builders`
 	  },
 	  {...}
 	]
+  }
+}
+```
+
+# Generator task request
+Wysyłane przez generatora do serwera. Dane do taska zostały utworzone i powinny być wysłane do wybranego buildera.
+```json
+{
+  "message_uuid": "message_uuid_v4",
+  "sender": "generator",
+  "type": "generator_task_request",
+  "content": {
+	"builder_uuid": "requested builder uuid",
+	"flake_url": "https://example.com/"
+	"client_config": "{nix = \"expression\"}",
+	"task_input": "{another_nix = \"expression\"}"
+  }
+}
+```
+
+# Generator task request response
+Odpowiedź buildera, kopia `task_request_response`
+```json
+{
+  "message_uuid"": "message_uuid_v4",
+  "sender": "server",
+  "type": "generator_task_request_response",
+  "content": {
+	"request_uuid": "server_message_uuid",
+	"response": "success"
+  }
+}
+```
+
+# Generator task completed
+Kopia `task_completed`
+```json
+{
+  "message_uuid": "message_uuid_v4",
+  "sender": "server",
+  "type": "generator_task_completed",
+  "content": {
+	"request_uuid": "server_message_uuid",
+	"response": "success", // Dowolny inny tekst oznacza błąd
+	"result": "result" // `cat ./result` po ukończeniu taska
+  }
+}
+```
+
+# Generator task cancel
+Kopia `task_cancel`. Wysyłana przez generator do buildera
+```json
+{
+  "message_uuid": "message_uuid_v4",
+  "sender": "generator",
+  "type": "generator_task_cancel",
+  "content": {
+	"builder_uuid": "requested builder uuid",
+	"task_uuid": "task request uuid",
   }
 }
 ```

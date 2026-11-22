@@ -1,7 +1,11 @@
 #pragma once
+#include <condition_variable>
+#include <queue>
 #include <filesystem>
+#include <fstream>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <stop_token>
 #include <thread>
 
@@ -50,7 +54,8 @@ public:
   void run();
 
 private:
-  void IPC_thread_handler(std::stop_token stop_token);
+  void IPC_input_thread_handler(std::stop_token stop_token);
+  void IPC_output_thread_handler(std::stop_token stop_token);
 
   MessageDispatcher message_dispatcher;
   std::vector<Task> tasks;
@@ -63,7 +68,13 @@ private:
   std::filesystem::path input_pipe;
   std::filesystem::path output_pipe;
 
-  std::jthread IPC_thread;
+  std::queue<AllMessagesVariant> output_queue;
+  std::mutex output_queue_mutex;
+  std::condition_variable output_queue_cv;
+  void send_message(const AllMessagesVariant& message);
+
+  std::jthread IPC_input_thread;
+  std::jthread IPC_output_thread;
   FILE *generator_stream = nullptr;
 };
 

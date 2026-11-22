@@ -92,6 +92,11 @@ std::string message_to_json(const Message &mes) {
     json["content"]["result"] = m.content.result;
     break;
   }
+  case Message::TASK_CANCEL: {
+    auto &m = static_cast<const MessageTaskCancel &>(mes);
+    json["content"]["task_uuid"] = m.content.task_uuid;
+    break;
+  }
   case Message::LOG: {
     auto &m = static_cast<const MessageLog &>(mes);
     json["content"]["message"] = m.content.message;
@@ -124,14 +129,42 @@ std::string message_to_json(const Message &mes) {
   case Message::GET_BUILDERS_RESPONSE: {
     auto &m = static_cast<const MessageGetBuildersResponse &>(mes);
     json["content"]["request_uuid"] = m.content.request_uuid;
+    json["content"]["builders"] = nlohmann::json::array();
     for (const auto &builder : m.content.builders) {
       nlohmann::json builder_json;
       builder_json["uuid"] = builder.uuid;
       builder_json["name"] = builder.name;
       builder_json["client_config"] = builder.client_config;
       builder_json["status"] = Message::builder_status_to_str(builder.status);
-      json.push_back(builder_json);
+      json["content"]["builders"].push_back(builder_json);
     }
+    break;
+  }
+  case Message::GENERATOR_TASK_REQUEST: {
+    auto &m = static_cast<const MessageGeneratorTaskRequest &>(mes);
+    json["content"]["builder_uuid"] = m.content.builder_uuid;
+    json["content"]["flake_url"] = m.content.flake_url;
+    json["content"]["client_config"] = m.content.client_config;
+    json["content"]["task_input"] = m.content.task_input;
+    break;
+  }
+  case Message::GENERATOR_TASK_REQUEST_RESPONSE: {
+    auto &m = static_cast<const MessageGeneratorTaskRequestResponse &>(mes);
+    json["content"]["request_uuid"] = m.content.request_uuid;
+    json["content"]["response"] = m.content.response;
+    break;
+  }
+  case Message::GENERATOR_TASK_COMPLETED: {
+    auto &m = static_cast<const MessageGeneratorTaskCompleted &>(mes);
+    json["content"]["request_uuid"] = m.content.request_uuid;
+    json["content"]["response"] = m.content.response;
+    json["content"]["result"] = m.content.result;
+    break;
+  }
+  case Message::GENERATOR_TASK_CANCEL: {
+    auto &m = static_cast<const MessageGeneratorTaskCancel &>(mes);
+    json["content"]["task_uuid"] = m.content.task_uuid;
+    json["content"]["builder_uuid"] = m.content.builder_uuid;
     break;
   }
   }
@@ -176,6 +209,12 @@ std::optional<AllMessagesVariant> json_to_message(std::string_view json) {
       mes.content.response = obj["content"]["response"];
       mes.content.request_uuid = obj["content"]["request_uuid"];
       mes.content.result = obj["content"]["result"];
+      return AllMessagesVariant{mes};
+    }
+    if (obj["type"] == "task_cancel") {
+      MessageTaskCancel mes;
+      fill_common(mes, obj);
+      mes.content.task_uuid = obj["content"]["task_uuid"];
       return AllMessagesVariant{mes};
     }
     if (obj["type"] == "log") {
@@ -227,6 +266,37 @@ std::optional<AllMessagesVariant> json_to_message(std::string_view json) {
             builder["uuid"], builder["name"], builder["client_config"],
             Message::str_to_builder_status(builder["status"].dump()));
       }
+      return AllMessagesVariant{mes};
+    }
+    if (obj["type"] == "generator_task_request") {
+      MessageGeneratorTaskRequest mes;
+      fill_common(mes, obj);
+      mes.content.builder_uuid = obj["content"]["builder_uuid"];
+      mes.content.client_config = obj["content"]["client_config"];
+      mes.content.flake_url = obj["content"]["flake_url"];
+      mes.content.task_input = obj["content"]["task_input"];
+      return AllMessagesVariant{mes};
+    }
+    if (obj["type"] == "generator_task_request_response") {
+      MessageGeneratorTaskRequestResponse mes;
+      fill_common(mes, obj);
+      mes.content.response = obj["content"]["response"];
+      mes.content.request_uuid = obj["content"]["request_uuid"];
+      return AllMessagesVariant{mes};
+    }
+    if (obj["type"] == "generator_task_completed") {
+      MessageGeneratorTaskCompleted mes;
+      fill_common(mes, obj);
+      mes.content.response = obj["content"]["response"];
+      mes.content.request_uuid = obj["content"]["request_uuid"];
+      mes.content.result = obj["content"]["result"];
+      return AllMessagesVariant{mes};
+    }
+    if (obj["type"] == "generator_task_cancel") {
+      MessageGeneratorTaskCancel mes;
+      fill_common(mes, obj);
+      mes.content.builder_uuid = obj["content"]["builder_uuid"];
+      mes.content.task_uuid = obj["content"]["task_uuid"];
       return AllMessagesVariant{mes};
     }
 

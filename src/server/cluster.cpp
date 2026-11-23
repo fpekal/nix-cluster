@@ -131,14 +131,14 @@ Generator::Generator(std::shared_ptr<TaskSet> task_set,
   mknod(std::string{input_pipe}.c_str(), S_IFIFO | S_IRUSR | S_IWUSR, 0);
   mknod(std::string{output_pipe}.c_str(), S_IFIFO | S_IRUSR | S_IWUSR, 0);
 
-  // Response for PINGs
+  // Log messages
   message_dispatcher.bind_handler(
       Message::LOG, std::make_shared<MessageDispatcher::Handler>(
                         [this](const AllMessagesVariant &message) {
                           const MessageLog &m = std::get<MessageLog>(message);
 
                           Logger::get_logger().log_raw(
-                              INFO, "[Generator {}] {}",
+                              INFO, "[\e[0;33mGenerator {}\e[0m] {}",
                               this->task_set->flake_url, m.content.message);
                         }));
 
@@ -284,7 +284,7 @@ void Generator::run() {
       std::string{input_pipe}, std::string{output_pipe});
   Logger::get_logger().log(DEBUG, "Running generator with: `{}`", formatted);
 
-  generator_stream = popen(formatted.c_str(), "r");
+  generator_stream = popen(formatted.c_str(), "w");
 }
 
 void Generator::IPC_input_thread_handler(std::stop_token stop_token) {
@@ -296,6 +296,9 @@ void Generator::IPC_input_thread_handler(std::stop_token stop_token) {
       input >> json;
 
       auto message = json_to_message(json.dump());
+
+      Logger::get_logger().log(DEBUG, "Got message from generator {}",
+                               task_set->flake_url);
 
       message_dispatcher.dispatch(message.value());
     }
@@ -329,7 +332,8 @@ void Generator::IPC_output_thread_handler(std::stop_token stop_token) {
 
     lock.unlock();
 
-    output << message_to_json(*reinterpret_cast<Message *>(&message));
+    output << message_to_json(*reinterpret_cast<Message *>(&message)) << ' ';
+    output.flush();
 
     lock.lock();
   }
@@ -343,10 +347,17 @@ void Generator::send_message(const AllMessagesVariant &message) {
 }
 
 Cluster::Cluster(std::string_view url) : rabbitmq{url} {
-  auto task_set = std::make_shared<TaskSet>();
-  task_set->flake_url = ".";
-  Generator g{task_set, &rabbitmq, this};
-  g.run();
+  std::thread test_thread{[this]() {
+    auto task_set = std::make_shared<TaskSet>();
+    task_set->flake_url = ".";
+    Generator g{task_set, &rabbitmq, this};
+    g.run();
+
+    while (true) {
+      std::this_thread::sleep_for(std::chrono::seconds{5});
+    }
+  }};
+  test_thread.detach();
 
   heartbeat_thread =
       std::jthread{std::bind_front<&Cluster::heartbeat_thread_handler>(this)};

@@ -15,10 +15,12 @@
       }: {
         packages = {
           core = pkgs.callPackage ./src/core/default.nix {};
-          test = pkgs.callPackage ./src/test/default.nix {inherit (self'.packages) core;};
+          test = pkgs.callPackage ./src/test/default.nix {inherit (self'.packages) core generatorFramework;};
           builder = pkgs.callPackage ./src/builder/default.nix {inherit (self'.packages) core;};
           server = pkgs.callPackage ./src/server/default.nix {inherit (self'.packages) core;};
-          default = self'.packages.server;
+          generatorFramework = pkgs.callPackage ./src/generator-framework/default.nix {inherit (self'.packages) core;};
+          default = self'.packages.test;
+          generator = self'.packages.test;
         };
       };
     };

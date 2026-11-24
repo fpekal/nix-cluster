@@ -17,8 +17,9 @@ std::shared_ptr<Framework> Framework::create(int argc, char *argv[]) {
 
 Framework::Framework(int argc, char *argv[]) {
   if (argc != 3) {
-    Logger::get_logger().log(ERROR, "Generator got {} arguments. Expected 2",
-                             argc - 1);
+    Logger::get_logger().log(
+        ERROR, "Generator got {} arguments. Expected 2. Run using the server.",
+        argc - 1);
     exit(1);
     return;
   }

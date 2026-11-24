@@ -31,7 +31,7 @@ int main() {
       std::make_shared<MessageDispatcher::Handler>(
           [client_uuid, &rabbitmq](const AllMessagesVariant &message) {
             Logger::get_logger().log(DEBUG, "Got PING");
-            auto &m = std::get<MessagePing>(message);
+            const auto &m = std::get<MessagePing>(message);
             MessagePong new_message;
             new_message.sender = client_uuid;
             new_message.message_uuid = UUID::generate();
@@ -48,7 +48,7 @@ int main() {
       std::make_shared<MessageDispatcher::Handler>(
           [client_uuid, &rabbitmq](const AllMessagesVariant &message) {
             Logger::get_logger().log(DEBUG, "Got DISCOVERY");
-            auto &m = std::get<MessageDiscovery>(message);
+            const auto &m = std::get<MessageDiscovery>(message);
             MessageDiscoveryResponse new_message;
             new_message.sender = client_uuid;
             new_message.message_uuid = UUID::generate();

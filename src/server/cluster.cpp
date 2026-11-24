@@ -49,8 +49,7 @@ void Task::build() {
            std::weak_ptr<MessageDispatcher::Handler>{
                task_completed_response_handler}](
           const AllMessagesVariant &message) {
-        const MessageTaskRequestResponse &m =
-            std::get<MessageTaskRequestResponse>(message);
+        const auto &m = std::get<MessageTaskRequestResponse>(message);
 
         if (m.content.request_uuid != new_message.message_uuid)
           return;
@@ -81,7 +80,7 @@ void Task::build() {
            std::weak_ptr<MessageDispatcher::Handler>{
                task_completed_response_handler}](
           const AllMessagesVariant &message) {
-        const MessageTaskCompleted &m = std::get<MessageTaskCompleted>(message);
+        const auto &m = std::get<MessageTaskCompleted>(message);
 
         if (m.content.request_uuid != new_message.message_uuid)
           return;
@@ -135,7 +134,7 @@ Generator::Generator(std::shared_ptr<TaskSet> task_set,
   message_dispatcher.bind_handler(
       Message::LOG, std::make_shared<MessageDispatcher::Handler>(
                         [this](const AllMessagesVariant &message) {
-                          const MessageLog &m = std::get<MessageLog>(message);
+                          const auto &m = std::get<MessageLog>(message);
 
                           Logger::get_logger().log_raw(
                               INFO, "[\e[0;33mGenerator {}\e[0m] {}",
@@ -147,7 +146,7 @@ Generator::Generator(std::shared_ptr<TaskSet> task_set,
       Message::GET_BUILDERS,
       std::make_shared<MessageDispatcher::Handler>(
           [this](const AllMessagesVariant &message) {
-            const MessageGetBuilders &m = std::get<MessageGetBuilders>(message);
+            const auto &m = std::get<MessageGetBuilders>(message);
 
             MessageGetBuildersResponse new_message;
             new_message.message_uuid = UUID::generate();
@@ -166,8 +165,7 @@ Generator::Generator(std::shared_ptr<TaskSet> task_set,
       Message::GENERATOR_TASK_REQUEST,
       std::make_shared<MessageDispatcher::Handler>(
           [this](const AllMessagesVariant &message) {
-            const MessageGeneratorTaskRequest &m =
-                std::get<MessageGeneratorTaskRequest>(message);
+            const auto &m = std::get<MessageGeneratorTaskRequest>(message);
 
             MessageTaskRequest new_message;
             new_message.message_uuid = UUID::generate();
@@ -186,8 +184,7 @@ Generator::Generator(std::shared_ptr<TaskSet> task_set,
                      std::weak_ptr<MessageDispatcher::Handler>{task_request_fn},
                  task_completed_fn = std::weak_ptr<MessageDispatcher::Handler>{
                      task_completed_fn}](const AllMessagesVariant &message) {
-                  const MessageTaskRequestResponse &m =
-                      std::get<MessageTaskRequestResponse>(message);
+                  const auto &m = std::get<MessageTaskRequestResponse>(message);
 
                   if (m.content.request_uuid != new_message.message_uuid)
                     return;
@@ -215,8 +212,7 @@ Generator::Generator(std::shared_ptr<TaskSet> task_set,
                      std::weak_ptr<MessageDispatcher::Handler>{task_request_fn},
                  task_completed_fn = std::weak_ptr<MessageDispatcher::Handler>{
                      task_completed_fn}](const AllMessagesVariant &message) {
-                  const MessageTaskCompleted &m =
-                      std::get<MessageTaskCompleted>(message);
+                  const auto &m = std::get<MessageTaskCompleted>(message);
 
                   if (m.content.request_uuid != new_message.message_uuid)
                     return;
@@ -249,8 +245,7 @@ Generator::Generator(std::shared_ptr<TaskSet> task_set,
       Message::GENERATOR_TASK_CANCEL,
       std::make_shared<MessageDispatcher::Handler>(
           [this](const AllMessagesVariant &message) {
-            const MessageGeneratorTaskCancel &m =
-                std::get<MessageGeneratorTaskCancel>(message);
+            const auto &m = std::get<MessageGeneratorTaskCancel>(message);
 
             MessageTaskCancel new_message;
             new_message.message_uuid = UUID::generate();
@@ -377,7 +372,7 @@ Cluster::Cluster(std::string_view url) : rabbitmq{url} {
       Message::INITIALIZE_BUILDER,
       std::make_shared<MessageDispatcher::Handler>(
           [this](const AllMessagesVariant &message) {
-            auto &m = std::get<MessageInitializeBuilder>(message);
+            const auto &m = std::get<MessageInitializeBuilder>(message);
 
             Logger::get_logger().log(INFO, "Builder {} connected",
                                      m.content.name);
@@ -396,7 +391,7 @@ Cluster::Cluster(std::string_view url) : rabbitmq{url} {
       Message::DISCOVERY_RESPONSE,
       std::make_shared<MessageDispatcher::Handler>(
           [this](const AllMessagesVariant &message) {
-            auto &m = std::get<MessageDiscoveryResponse>(message);
+            const auto &m = std::get<MessageDiscoveryResponse>(message);
 
             std::lock_guard guard{builders_mutex};
 
@@ -416,7 +411,7 @@ Cluster::Cluster(std::string_view url) : rabbitmq{url} {
   message_dispatcher.bind_handler(
       Message::PING, std::make_shared<MessageDispatcher::Handler>(
                          [this](const AllMessagesVariant &message) {
-                           auto &m = std::get<MessagePing>(message);
+                           const auto &m = std::get<MessagePing>(message);
 
                            MessagePong new_message;
                            new_message.sender = "server";
@@ -432,7 +427,7 @@ Cluster::Cluster(std::string_view url) : rabbitmq{url} {
   message_dispatcher.bind_handler(
       Message::LOG, std::make_shared<MessageDispatcher::Handler>(
                         [this](const AllMessagesVariant &message) {
-                          auto &m = std::get<MessageLog>(message);
+                          const auto &m = std::get<MessageLog>(message);
 
                           std::string builder_name = get_builder_name(m.sender);
 
@@ -518,7 +513,7 @@ void Cluster::remove_dead_thread_handler(std::stop_token stop_token) {
           [this, &promise, ping_message_uuid,
            pong_handler_fn = std::weak_ptr<MessageDispatcher::Handler>{
                pong_handler_fn}](const AllMessagesVariant &message) {
-            auto &m = std::get<MessagePong>(message);
+            const auto &m = std::get<MessagePong>(message);
 
             // If it's some other PONG message, ignore it
             if (m.content.ping_uuid != ping_message_uuid)

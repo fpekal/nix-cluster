@@ -45,8 +45,7 @@ std::future<Builders> Framework::get_builders() {
       [promise, new_message, this,
        get_builders_fn = std::weak_ptr<MessageDispatcher::Handler>{
            get_builders_fn}](const AllMessagesVariant &message) {
-        const MessageGetBuildersResponse &m =
-            std::get<MessageGetBuildersResponse>(message);
+        const auto &m = std::get<MessageGetBuildersResponse>(message);
 
         if (m.content.request_uuid != new_message.message_uuid)
           return;

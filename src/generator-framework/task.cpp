@@ -24,7 +24,7 @@ Task::Task(std::shared_ptr<Framework> framework, std::string_view builder_uuid,
 
   *generator_task_request_response_fn =
       [this, promise, new_message](const AllMessagesVariant &message) {
-        auto &m = std::get<MessageGeneratorTaskRequestResponse>(message);
+        const auto &m = std::get<MessageGeneratorTaskRequestResponse>(message);
 
         if (m.content.request_uuid != new_message.message_uuid)
           return;
@@ -42,7 +42,7 @@ Task::Task(std::shared_ptr<Framework> framework, std::string_view builder_uuid,
 
   *generator_task_completed_fn =
       [this, promise, new_message](const AllMessagesVariant &message) {
-        auto &m = std::get<MessageGeneratorTaskCompleted>(message);
+        const auto &m = std::get<MessageGeneratorTaskCompleted>(message);
 
         if (m.content.request_uuid != new_message.message_uuid)
           return;

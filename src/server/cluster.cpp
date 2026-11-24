@@ -179,17 +179,19 @@ Generator::Generator(std::shared_ptr<TaskSet> task_set,
             auto task_request_fn =
                 std::make_shared<MessageDispatcher::Handler>();
             *task_request_fn =
-                [new_message, this,
+                [new_message, m, this,
                  task_request_fn =
                      std::weak_ptr<MessageDispatcher::Handler>{task_request_fn},
                  task_completed_fn = std::weak_ptr<MessageDispatcher::Handler>{
                      task_completed_fn}](const AllMessagesVariant &message) {
-                  const auto &m = std::get<MessageTaskRequestResponse>(message);
-
-                  if (m.content.request_uuid != new_message.message_uuid)
+                  const auto &m2 =
+                      std::get<MessageTaskRequestResponse>(message);
+                  if (m2.content.request_uuid != new_message.message_uuid)
                     return;
 
-                  if (m.content.response != "success") {
+                  Logger::get_logger().log(DEBUG, "Builder accepted the task");
+
+                  if (m2.content.response != "success") {
                     this->cluster->message_dispatcher.unbind_handler(
                         Message::TASK_COMPLETED, task_completed_fn.lock());
                   }
@@ -197,8 +199,8 @@ Generator::Generator(std::shared_ptr<TaskSet> task_set,
                   MessageGeneratorTaskRequestResponse new_message_gen;
                   new_message_gen.message_uuid = UUID::generate();
                   new_message_gen.sender = "server";
-                  new_message_gen.content.request_uuid = m.content.request_uuid;
-                  new_message_gen.content.response = m.content.response;
+                  new_message_gen.content.request_uuid = m.message_uuid;
+                  new_message_gen.content.response = m2.content.response;
 
                   send_message(new_message_gen);
 
@@ -292,8 +294,8 @@ void Generator::IPC_input_thread_handler(std::stop_token stop_token) {
 
       auto message = json_to_message(json.dump());
 
-      Logger::get_logger().log(DEBUG, "Got message from generator {}",
-                               task_set->flake_url);
+      Logger::get_logger().log(DEBUG, "Got message from generator {}: {}",
+                               task_set->flake_url, json.dump());
 
       message_dispatcher.dispatch(message.value());
     }

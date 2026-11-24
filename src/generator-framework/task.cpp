@@ -29,6 +29,7 @@ Task::Task(std::shared_ptr<Framework> framework, std::string_view builder_uuid,
         if (m.content.request_uuid != new_message.message_uuid)
           return;
 
+        Logger::get_logger().log(DEBUG, "Got GENERATOR_TASK_REQUEST_RESPONSE");
         if (m.content.response != "success") {
           this->framework->message_dispatcher.unbind_handler(
               Message::GENERATOR_TASK_REQUEST_RESPONSE,

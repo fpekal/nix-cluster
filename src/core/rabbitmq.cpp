@@ -46,7 +46,7 @@ private:
     // @todo
     //  add your own implementation, for example initialize things
     //  to handle the connection.
-    Logger::get_logger().log(LoggerLevel::DEBUG, "TCP attached");
+    // Logger::get_logger().log(LoggerLevel::DEBUG, "TCP attached");
   }
 
   /**
@@ -60,8 +60,8 @@ private:
   virtual void onConnected(AMQP::TcpConnection *connection) override {
     // @todo
     //  add your own implementation (probably not needed)
-    Logger::get_logger().log(LoggerLevel::INFO,
-                             "Connected to the RabbitMQ instance");
+    // Logger::get_logger().log(LoggerLevel::INFO,
+    //                          "Connected to the RabbitMQ instance");
   }
 
   /**
@@ -79,7 +79,7 @@ private:
     // @todo
     //  add your own implementation, for example by reading out the
     //  certificate and check if it is indeed yours
-    Logger::get_logger().log(LoggerLevel::DEBUG, "TCP secured");
+    // Logger::get_logger().log(LoggerLevel::DEBUG, "TCP secured");
     return true;
   }
 
@@ -92,7 +92,7 @@ private:
     // @todo
     //  add your own implementation, for example by creating a channel
     //  instance, and start publishing or consuming
-    Logger::get_logger().log(LoggerLevel::DEBUG, "TCP ready");
+    // Logger::get_logger().log(LoggerLevel::DEBUG, "TCP ready");
   }
 
   /**
@@ -150,7 +150,7 @@ private:
     // @todo
     //  add your own implementation, like cleanup resources or exit the
     //  application
-    Logger::get_logger().log(LoggerLevel::DEBUG, "TCP detached");
+    // Logger::get_logger().log(LoggerLevel::DEBUG, "TCP detached");
   }
 
   /**
@@ -182,7 +182,7 @@ private:
       monitored_fds.insert({fd, flags});
     }
 
-    Logger::get_logger().log(LoggerLevel::DEBUG, "TCP monitor");
+    // Logger::get_logger().log(LoggerLevel::DEBUG, "TCP monitor");
   }
 };
 } // namespace
@@ -239,10 +239,10 @@ void RabbitMQ::monitor(int timeout) {
       flags |= AMQP::writable;
     }
 
-    if (flags != 0) {
-      Logger::get_logger().log(LoggerLevel::DEBUG, "fd {} status changed",
-                               poll.fd);
-    }
+    // if (flags != 0) {
+    //   Logger::get_logger().log(LoggerLevel::DEBUG, "fd {} status changed",
+    //                            poll.fd);
+    // }
 
     // INFO: this was locking the thread if in some message handler we tried to
     // send another message
@@ -483,7 +483,7 @@ void ServerRabbitMQ::send_message_to_one(const Message &message,
                               message_str);
   }
   Logger::get_logger().log(LoggerLevel::DEBUG,
-                           "Message sent: length={}, body={}",
+                           "Message sent to: {}: length={}, body={}", uuid,
                            message_str.length(), message_str);
 }
 

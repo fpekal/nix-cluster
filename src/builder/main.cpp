@@ -12,7 +12,7 @@
 #include "remote_sink.h"
 
 int main() {
-  Logger::get_logger().set_level(LoggerLevel::INFO);
+  Logger::get_logger().set_level(LoggerLevel::DEBUG);
 
   UUID client_uuid = UUID::generate();
   Logger::get_logger().log(LoggerLevel::INFO, "Client UUID: {}",
@@ -59,6 +59,22 @@ int main() {
 
             rabbitmq.send_message(new_message);
             Logger::get_logger().log(DEBUG, "Sent DISCOVERY_RESPONSE");
+          }));
+
+  message_dispatcher.bind_handler(
+      Message::TASK_REQUEST,
+      std::make_shared<MessageDispatcher::Handler>(
+          [client_uuid, &rabbitmq](const AllMessagesVariant &message) {
+            Logger::get_logger().log(DEBUG, "Got TASK_REQUEST");
+            const auto &m = std::get<MessageTaskRequest>(message);
+            MessageTaskRequestResponse new_message;
+            new_message.sender = client_uuid;
+            new_message.message_uuid = UUID::generate();
+            new_message.content.request_uuid = m.message_uuid;
+            new_message.content.response = "success";
+
+            rabbitmq.send_message(new_message);
+            Logger::get_logger().log(DEBUG, "Sent TASK_REQUEST_RESPONSE");
           }));
 
   rabbitmq.message_received_handler =

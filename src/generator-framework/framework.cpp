@@ -117,12 +117,8 @@ void Framework::output_thread_handler(std::stop_token stop_token) {
     AllMessagesVariant message = output_queue.back();
     output_queue.pop();
 
-    lock.unlock();
-
     output << message_to_json(*reinterpret_cast<Message *>(&message)) << ' ';
     output.flush();
-
-    lock.lock();
   }
 }
 

@@ -23,5 +23,17 @@
           generator = self'.packages.test;
         };
       };
+
+      flake = {
+        taskTemplate = {
+          taskInput,
+          builderConfig,
+          pkgs,
+        }:
+          pkgs.runCommand "example" {} ''
+            sleep 10
+            echo "example!" >> $out
+          '';
+      };
     };
 }

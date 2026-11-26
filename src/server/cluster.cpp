@@ -209,21 +209,27 @@ Generator::Generator(std::shared_ptr<TaskSet> task_set,
                 };
 
             *task_completed_fn =
-                [new_message, this,
+                [new_message, this, m,
                  task_request_fn =
                      std::weak_ptr<MessageDispatcher::Handler>{task_request_fn},
                  task_completed_fn = std::weak_ptr<MessageDispatcher::Handler>{
                      task_completed_fn}](const AllMessagesVariant &message) {
-                  const auto &m = std::get<MessageTaskCompleted>(message);
+                  const auto &m2 = std::get<MessageTaskCompleted>(message);
 
-                  if (m.content.request_uuid != new_message.message_uuid)
+                  Logger::get_logger().log(ERROR, "Got completed message");
+
+                  if (m2.content.request_uuid != new_message.message_uuid)
                     return;
 
                   MessageGeneratorTaskCompleted new_message_gen;
                   new_message_gen.message_uuid = UUID::generate();
                   new_message_gen.sender = "server";
-                  new_message_gen.content.request_uuid = m.content.request_uuid;
-                  new_message_gen.content.response = m.content.response;
+                  new_message_gen.content.request_uuid = m.message_uuid;
+                  new_message_gen.content.response = m2.content.response;
+                  new_message_gen.content.result = m2.content.result;
+
+                  Logger::get_logger().log(
+                      ERROR, "Sent completed message to the generator");
 
                   send_message(new_message_gen);
 
@@ -346,7 +352,7 @@ void Generator::send_message(const AllMessagesVariant &message) {
 Cluster::Cluster(std::string_view url) : rabbitmq{url} {
   std::thread test_thread{[this]() {
     auto task_set = std::make_shared<TaskSet>();
-    task_set->flake_url = ".";
+    task_set->flake_url = "/home/filip/dev/nix-cluster";
     Generator g{task_set, &rabbitmq, this};
     g.run();
 

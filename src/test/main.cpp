@@ -21,12 +21,13 @@ int main(int argc, char *argv[]) {
     if (builders.size() == 0)
       continue;
 
-    task = std::make_shared<Task>(
-        f->create_task(builders.begin()->first, "{}", ".", "{}"));
+    task = std::make_shared<Task>(f->create_task(
+        builders.begin()->first, "{}", "/home/filip/dev/nix-cluster", "{}"));
 
     break;
   }
 
   Logger::get_logger().log(ERROR, "Waiting for result");
-  Logger::get_logger().log(ERROR, "{}", task->get_future().get());
+  Logger::get_logger().log(ERROR, "RESULT ON GENERATOR: {}",
+                           task->get_future().get());
 }

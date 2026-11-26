@@ -52,7 +52,7 @@ Example flake:
       perSystem = {pkgs, ...}: {
         packages = {
           generator = pkgs.callPackage ./generator.nix {}; # Nothing weird here
-          taskTempltae = pkgs.callPackage (
+          taskTemplate = pkgs.callPackage (
             {stdenv, taskInput, builderConfig, ...}:
               stdenv.mkDerivation {
                 pname = "client";

@@ -6,14 +6,15 @@
 
 class LoggerSinkRemote : public LoggerSink {
 public:
-  LoggerSinkRemote(BuilderRabbitMQ &rabbitmq, std::string_view client_uuid)
+  LoggerSinkRemote(std::shared_ptr<BuilderRabbitMQ> &rabbitmq,
+                   std::string_view client_uuid)
       : rabbitmq{rabbitmq}, client_uuid{client_uuid} {}
 
   virtual void send_raw_message(std::string_view) override;
   virtual void flush() override;
 
 private:
-  BuilderRabbitMQ &rabbitmq;
+  std::shared_ptr<BuilderRabbitMQ> rabbitmq;
   std::string client_uuid;
 
   // When not connected to the rabbitmq, add log to the queue send them on the

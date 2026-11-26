@@ -45,8 +45,14 @@ Task::Task(std::shared_ptr<Framework> framework, std::string_view builder_uuid,
       [this, promise, new_message](const AllMessagesVariant &message) {
         const auto &m = std::get<MessageGeneratorTaskCompleted>(message);
 
+        Logger::get_logger().log(ERROR, "Got task completed message");
+        Logger::get_logger().log(ERROR, "Generator message: {}",
+                                 message_to_json(m));
+
         if (m.content.request_uuid != new_message.message_uuid)
           return;
+
+        Logger::get_logger().log(ERROR, "Good uuid");
 
         if (m.content.response != "success") {
           this->framework->message_dispatcher.unbind_handler(
@@ -54,9 +60,10 @@ Task::Task(std::shared_ptr<Framework> framework, std::string_view builder_uuid,
               generator_task_request_response_fn);
           this->framework->message_dispatcher.unbind_handler(
               Message::GENERATOR_TASK_COMPLETED, generator_task_completed_fn);
-
           promise->set_exception(std::make_exception_ptr(std::exception{}));
         }
+
+        Logger::get_logger().log(ERROR, "Success!");
 
         promise->set_value(m.content.result);
       };

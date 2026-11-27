@@ -330,7 +330,7 @@ void Generator::IPC_output_thread_handler(std::stop_token stop_token) {
     if (output_queue.empty())
       continue;
 
-    AllMessagesVariant message = output_queue.back();
+    AllMessagesVariant message = output_queue.front();
     output_queue.pop();
 
     lock.unlock();

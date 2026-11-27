@@ -31,7 +31,7 @@
           pkgs,
         }:
           pkgs.runCommand "example" {} ''
-            sleep 10
+            sleep 17
             echo "example!" >> $out
           '';
       };

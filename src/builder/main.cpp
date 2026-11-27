@@ -1,10 +1,14 @@
 #include <chrono>
+#include <csignal>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <future>
 #include <memory>
 #include <stop_token>
+#include <sys/wait.h>
 #include <thread>
+#include <unistd.h>
 #include <variant>
 
 #include <logger.h>
@@ -45,7 +49,7 @@ public:
     auto promise = std::make_shared<std::promise<std::string>>();
     result = promise->get_future().share();
 
-    runner_thread = std::jthread{[rabbitmq, flake_source, promise]() {
+    runner_thread = std::jthread{[rabbitmq, flake_source, promise, this]() {
       std::filesystem::path flake_dir = std::filesystem::temp_directory_path() /
                                         std::string{UUID::generate()};
       std::filesystem::create_directory(flake_dir);
@@ -54,22 +58,44 @@ public:
       file << flake_source;
       file.flush();
 
-      std::ignore = std::system(
-          std::format("nix build {}", std::string{flake_dir}).c_str());
+      pid = fork();
+      Logger::get_logger().log(ERROR, "PID: {}", pid);
+      if (pid == 0) {
+        execlp("nix", "nix", "build", std::string{flake_dir}.c_str(), nullptr);
+      }
 
-      std::ifstream result_file{"./result", std::ios::binary};
-      std::stringstream ss;
-      ss << result_file.rdbuf();
-      ss.flush();
-      std::string result_file_content = ss.str();
+      waitpid(pid, nullptr, 0);
+      pid = -1;
 
-      promise->set_value(result_file_content);
+      if (!std::filesystem::is_symlink("./result")) {
+        // Building failed
+        Logger::get_logger().log(ERROR, "Building didn't create `result` file");
+        promise->set_exception(std::make_exception_ptr(std::exception{}));
+      } else {
+        // Building succeded
+        std::ifstream result_file{"./result", std::ios::binary};
+        std::stringstream ss;
+        ss << result_file.rdbuf();
+        ss.flush();
+        std::string result_file_content = ss.str();
+
+        promise->set_value(result_file_content);
+
+        std::filesystem::remove("result");
+      }
     }};
   }
 
   std::shared_future<std::string> get_result() { return result; }
 
+  void cancel() {
+    Logger::get_logger().log(ERROR, "PID: {}", pid);
+    if (pid != -1)
+      kill(pid, SIGKILL);
+  }
+
 private:
+  int pid = -1;
   std::jthread runner_thread;
   std::shared_future<std::string> result;
   std::shared_ptr<BuilderRabbitMQ> rabbitmq;
@@ -161,13 +187,23 @@ int main() {
                 std::jthread{[rabbitmq, new_message, &running_task,
                               &wait_for_task, m](std::stop_token stop_token) {
                   auto future = running_task->get_result();
-                  std::string results = future.get();
+                  std::string results = "";
+                  bool success = true;
+                  try {
+                    results = future.get();
+                  } catch (...) {
+                    success = false;
+                  }
 
                   MessageTaskCompleted new_message2;
                   new_message2.message_uuid = UUID::generate();
                   new_message2.sender = "builder";
                   new_message2.content.request_uuid = m.message_uuid;
-                  new_message2.content.response = "success";
+                  if (success) {
+                    new_message2.content.response = "success";
+                  } else {
+                    new_message2.content.response = "failure";
+                  }
                   new_message2.content.result = results;
 
                   rabbitmq->send_message(new_message2);

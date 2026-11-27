@@ -30,4 +30,6 @@ int main(int argc, char *argv[]) {
   Logger::get_logger().log(ERROR, "Waiting for result");
   Logger::get_logger().log(ERROR, "RESULT ON GENERATOR: {}",
                            task->get_future().get());
+
+  task->get_future().wait();
 }

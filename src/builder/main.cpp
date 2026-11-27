@@ -105,6 +105,7 @@ int main() {
   Logger::get_logger().set_level(LoggerLevel::DEBUG);
 
   UUID client_uuid = UUID::generate();
+  BuilderStatus status = BuilderStatus::IDLE;
   Logger::get_logger().log(LoggerLevel::INFO, "Client UUID: {}",
                            std::string{client_uuid});
   auto rabbitmq = std::make_shared<BuilderRabbitMQ>(
@@ -139,7 +140,7 @@ int main() {
   message_dispatcher.bind_handler(
       Message::DISCOVERY,
       std::make_shared<MessageDispatcher::Handler>(
-          [client_uuid, rabbitmq](const AllMessagesVariant &message) {
+          [client_uuid, rabbitmq, &status](const AllMessagesVariant &message) {
             Logger::get_logger().log(DEBUG, "Got DISCOVERY");
             const auto &m = std::get<MessageDiscovery>(message);
             MessageDiscoveryResponse new_message;
@@ -148,7 +149,7 @@ int main() {
             new_message.content.request_uuid = m.message_uuid;
             new_message.content.name = "Joshua";
             new_message.content.client_config = "{amo=\"gus\";}";
-            new_message.content.status = BuilderStatus::IDLE;
+            new_message.content.status = status;
 
             rabbitmq->send_message(new_message);
             Logger::get_logger().log(DEBUG, "Sent DISCOVERY_RESPONSE");
@@ -157,8 +158,8 @@ int main() {
   message_dispatcher.bind_handler(
       Message::TASK_REQUEST,
       std::make_shared<MessageDispatcher::Handler>(
-          [client_uuid, rabbitmq, &running_task,
-           &wait_for_task](const AllMessagesVariant &message) {
+          [client_uuid, rabbitmq, &running_task, &wait_for_task,
+           &status](const AllMessagesVariant &message) {
             Logger::get_logger().log(DEBUG, "Got TASK_REQUEST");
             const auto &m = std::get<MessageTaskRequest>(message);
             MessageTaskRequestResponse new_message;
@@ -179,39 +180,41 @@ int main() {
             if (running_task)
               return;
 
+            status = BuilderStatus::WORKING;
             running_task = std::make_unique<Task>(
                 rabbitmq, m.content.client_config, m.content.flake_url,
                 m.content.task_input);
 
-            wait_for_task =
-                std::jthread{[rabbitmq, new_message, &running_task,
-                              &wait_for_task, m](std::stop_token stop_token) {
-                  auto future = running_task->get_result();
-                  std::string results = "";
-                  bool success = true;
-                  try {
-                    results = future.get();
-                  } catch (...) {
-                    success = false;
-                  }
+            wait_for_task = std::jthread{[rabbitmq, new_message, &running_task,
+                                          &wait_for_task, m,
+                                          &status](std::stop_token stop_token) {
+              auto future = running_task->get_result();
+              std::string results = "";
+              bool success = true;
+              try {
+                results = future.get();
+              } catch (...) {
+                success = false;
+              }
 
-                  MessageTaskCompleted new_message2;
-                  new_message2.message_uuid = UUID::generate();
-                  new_message2.sender = "builder";
-                  new_message2.content.request_uuid = m.message_uuid;
-                  if (success) {
-                    new_message2.content.response = "success";
-                  } else {
-                    new_message2.content.response = "failure";
-                  }
-                  new_message2.content.result = results;
+              MessageTaskCompleted new_message2;
+              new_message2.message_uuid = UUID::generate();
+              new_message2.sender = "builder";
+              new_message2.content.request_uuid = m.message_uuid;
+              if (success) {
+                new_message2.content.response = "success";
+              } else {
+                new_message2.content.response = "failure";
+              }
+              new_message2.content.result = results;
 
-                  rabbitmq->send_message(new_message2);
+              rabbitmq->send_message(new_message2);
 
-                  Logger::get_logger().log(INFO, "Sent task results");
+              Logger::get_logger().log(INFO, "Sent task results");
 
-                  running_task = std::unique_ptr<Task>{};
-                }};
+              running_task = std::unique_ptr<Task>{};
+              status = BuilderStatus::IDLE;
+            }};
           }));
 
   rabbitmq->message_received_handler =

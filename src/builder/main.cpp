@@ -66,6 +66,8 @@ public:
       waitpid(pid, nullptr, 0);
       pid = -1;
 
+      std::filesystem::remove_all(flake_dir);
+
       if (!std::filesystem::is_symlink("./result")) {
         // Building failed
         Logger::get_logger().log(ERROR, "Building didn't create `result` file");

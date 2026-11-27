@@ -99,16 +99,28 @@ private:
   std::shared_ptr<BuilderRabbitMQ> rabbitmq;
 };
 
-int main() {
+int main(int argc, char *argv[]) {
+  if (argc != 4) {
+    Logger::get_logger().log(
+        ERROR, "Expected 3 arguments: amqp_uri, builder_name, builder_config");
+    exit(1);
+  }
+
+  // amqp://nix-cluster:develop@amogus:5672/nix-cluster
+  std::string amqp_uri = argv[1];
+
+  BuilderInfo builder_info;
+  builder_info.name = argv[2];
+  builder_info.client_config = argv[3];
+
   Logger::get_logger().set_level(LoggerLevel::DEBUG);
 
   UUID client_uuid = UUID::generate();
   BuilderStatus status = BuilderStatus::IDLE;
   Logger::get_logger().log(LoggerLevel::INFO, "Client UUID: {}",
                            std::string{client_uuid});
-  auto rabbitmq = std::make_shared<BuilderRabbitMQ>(
-      "amqp://nix-cluster:develop@amogus:5672/nix-cluster",
-      std::string{client_uuid});
+  auto rabbitmq =
+      std::make_shared<BuilderRabbitMQ>(amqp_uri, std::string{client_uuid});
 
   auto remote_sink =
       std::make_unique<LoggerSinkRemote>(rabbitmq, std::string{client_uuid});
@@ -232,7 +244,7 @@ int main() {
     }
   }};
 
-  auto foo = std::async([rabbitmq, client_uuid]() {
+  auto foo = std::async([rabbitmq, client_uuid, builder_info]() {
     auto ready_future = rabbitmq->get_ready_future();
     ready_future.wait();
 
@@ -240,8 +252,8 @@ int main() {
       MessageInitializeBuilder init_build;
       init_build.message_uuid = UUID::generate();
       init_build.sender = client_uuid;
-      init_build.content.name = "Joshua";
-      init_build.content.client_config = "{amo=\"gus\";}";
+      init_build.content.name = builder_info.name;
+      init_build.content.client_config = builder_info.client_config;
 
       rabbitmq->send_message(init_build);
     }

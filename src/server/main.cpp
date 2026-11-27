@@ -11,9 +11,14 @@
 
 #include "cluster.h"
 
-int main() {
+int main(int argc, char *argv[]) {
   Logger::get_logger().set_level(LoggerLevel::DEBUG);
-  Cluster cluster{"amqp://nix-cluster:develop@amogus:5672/nix-cluster"};
+  if (argc != 2) {
+    Logger::get_logger().log(ERROR, "Expected 1 argument: amqp_uri");
+  }
+
+  // amqp://nix-cluster:develop@amogus:5672/nix-cluster
+  Cluster cluster{argv[1]};
 
   while (true) {
     std::this_thread::sleep_for(std::chrono::seconds{5});

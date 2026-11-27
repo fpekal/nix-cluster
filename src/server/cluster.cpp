@@ -594,12 +594,13 @@ void Cluster::discovery_thread_handler(std::stop_token stop_token) {
 
   while (!stop_token.stop_requested()) {
     using namespace std::chrono_literals;
-    std::this_thread::sleep_for(10s);
 
     MessageDiscovery message;
     message.sender = "server";
     message.message_uuid = UUID::generate();
 
     rabbitmq.send_message_broadcast(message);
+
+    std::this_thread::sleep_for(10s);
   }
 }

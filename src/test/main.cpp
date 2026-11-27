@@ -15,11 +15,12 @@ int main(int argc, char *argv[]) {
   std::shared_ptr<Task> task;
 
   while (true) {
-    std::this_thread::sleep_for(std::chrono::seconds{5});
     auto builders = f->get_builders().get();
 
-    if (builders.size() == 0)
+    if (builders.size() == 0) {
+      std::this_thread::sleep_for(std::chrono::seconds{5});
       continue;
+    }
 
     task = std::make_shared<Task>(f->create_task(
         builders.begin()->first, "{}", "/home/filip/dev/nix-cluster", "{}"));

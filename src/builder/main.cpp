@@ -59,7 +59,6 @@ public:
       file.flush();
 
       pid = fork();
-      Logger::get_logger().log(ERROR, "PID: {}", pid);
       if (pid == 0) {
         execlp("nix", "nix", "build", std::string{flake_dir}.c_str(), nullptr);
       }
@@ -89,7 +88,6 @@ public:
   std::shared_future<std::string> get_result() { return result; }
 
   void cancel() {
-    Logger::get_logger().log(ERROR, "PID: {}", pid);
     if (pid != -1)
       kill(pid, SIGKILL);
   }

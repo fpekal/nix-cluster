@@ -216,8 +216,6 @@ Generator::Generator(std::shared_ptr<TaskSet> task_set,
                      task_completed_fn}](const AllMessagesVariant &message) {
                   const auto &m2 = std::get<MessageTaskCompleted>(message);
 
-                  Logger::get_logger().log(ERROR, "Got completed message");
-
                   if (m2.content.request_uuid != new_message.message_uuid)
                     return;
 
@@ -227,9 +225,6 @@ Generator::Generator(std::shared_ptr<TaskSet> task_set,
                   new_message_gen.content.request_uuid = m.message_uuid;
                   new_message_gen.content.response = m2.content.response;
                   new_message_gen.content.result = m2.content.result;
-
-                  Logger::get_logger().log(
-                      ERROR, "Sent completed message to the generator");
 
                   send_message(new_message_gen);
 
